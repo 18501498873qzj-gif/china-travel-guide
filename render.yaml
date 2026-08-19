@@ -1,0 +1,13 @@
+# Build
+buildCommand = "cd backend && npm install && cp frontend/index.html backend/ && echo 'build done'"
+
+# Run
+startCommand = "cd backend && node index.js"
+
+# Listen port (matches index.js PORT 3000)
+[services]
+port = 3000
+
+[[services.env]]
+key = "NODE_ENV"
+value = "production"

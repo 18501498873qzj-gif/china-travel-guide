@@ -1,0 +1,13 @@
+{
+  "name": "china-travel-guide",
+  "version": "1.0.0",
+  "description": "中国旅行攻略生成器 - 飞书知识库 + DeepSeek AI + .doc 输出 + 23 种语言",
+  "scripts": {
+    "postinstall": "cd backend && npm install && cp ../frontend/index.html ./index.html",
+    "start": "node backend/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}

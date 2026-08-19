@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>China Travel Guide Generator · 中国旅行攻略生成器</title>
+<style>
+  :root {
+    --primary: #c0392b;
+    --primary-dark: #922b21;
+    --accent: #e67e22;
+    --bg: #faf6f0;
+    --card: #ffffff;
+    --text: #2c3e50;
+    --muted: #7f8c8d;
+    --border: #e8e0d4;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    padding: 48px 24px 40px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 28px; margin-bottom: 8px; letter-spacing: 0.5px; }
+  .hero p { opacity: 0.92; font-size: 15px; }
+  .hero .subtag {
+    margin-top: 12px;
+    font-size: 13px;
+    opacity: 0.75;
+  }
+  .container {
+    max-width: 760px;
+    margin: -24px auto 48px;
+    padding: 0 20px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 32px;
+    margin-bottom: 20px;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin-bottom: 18px;
+    padding-bottom: 8px;
+    border-bottom: 1.5px dashed var(--border);
+  }
+  .form-group { margin-bottom: 20px; }
+  label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: var(--text);
+  }
+  label .hint { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 6px; }
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #fdfdfd;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .row .form-group { flex: 1; min-width: 140px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    padding: 6px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    background: #fdfdfd;
+  }
+  .chip:hover { border-color: var(--primary); }
+  .chip.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  .budget-convert-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .budget-convert-hint b { color: var(--primary-dark); }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-top: 8px;
+  }
+  .btn:hover:not(:disabled) { background: var(--primary-dark); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .status {
+    text-align: center;
+    padding: 16px;
+    color: var(--muted);
+    font-size: 14px;
+    display: none;
+  }
+  .status.show { display: block; }
+  .status .spinner {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error {
+    background: #fdecea;
+    color: var(--primary-dark);
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-top: 16px;
+    display: none;
+  }
+  .error.show { display: block; }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 24px;
+  }
+  .flag {
+    display: inline-block;
+    margin-right: 6px;
+  }
+</style>
+</head>
+<body>
+  <div class="hero">
+    <h1>🧭 China Travel Guide Generator</h1>
+    <p>📸 Check-in first · 🏨 Hotel advice · 🧭 Navigation · 💰 Auto currency convert · 🌍 23 languages</p>
+    <div class="subtag">本地人数据 + AI · 一键下载 Word 攻略</div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+
+      <div class="section-title">🌍 Language & Currency · 语言与货币</div>
+
+      <div class="row">
+        <div class="form-group">
+          <label>Guide Language · 攻略语言 <span class="hint">All content except addresses</span></label>
+          <select id="language">
+            <option value="English" selected>🇺🇸 English (US)</option>
+            <option value="English (UK)">🇬🇧 English (UK)</option>
+            <option value="English (AU)">🇦🇺 English (AU)</option>
+            <option value="English (CA)">🇨🇦 English (CA)</option>
+            <option value="中文">🇨🇳 中文（简体）</option>
+            <option value="中文(繁体)">🇹🇼 中文（繁體）</option>
+            <option value="日本語">🇯🇵 日本語</option>
+            <option value="한국어">🇰🇷 한국어</option>
+            <option value="Français">🇫🇷 Français</option>
+            <option value="Deutsch">🇩🇪 Deutsch</option>
+            <option value="Español">🇪🇸 Español (EU)</option>
+            <option value="Español (MX)">🇲🇽 Español (MX)</option>
+            <option value="Italiano">🇮🇹 Italiano</option>
+            <option value="Português">🇵🇹 Português (EU)</option>
+            <option value="Português (BR)">🇧🇷 Português (BR)</option>
+            <option value="Русский">🇷🇺 Русский</option>
+            <option value="ไทย">🇹🇭 ไทย</option>
+            <option value="Tiếng Việt">🇻🇳 Tiếng Việt</option>
+            <option value="Bahasa Indonesia">🇮🇩 Bahasa Indonesia</option>
+            <option value="Bahasa Melayu">🇲🇾 Bahasa Melayu</option>
+            <option value="Filipino">🇵🇭 Filipino</option>
+            <option value="हिन्दी">🇮🇳 हिन्दी</option>
+            <option value="العربية">🇦🇪 العربية</option>
+            <option value="Türkçe">🇹🇷 Türkçe</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Currency · 货币单位 <span class="hint">All prices auto converted</span></label>
+          <select id="currency">
+            <option value="USD">🇺🇸 USD — US Dollar ($)</option>
+            <option value="CNY">🇨🇳 CNY — 人民币 (¥)</option>
+            <option value="EUR">🇪🇺 EUR — Euro (€)</option>
+            <option value="GBP">🇬🇧 GBP — British Pound (£)</option>
+            <option value="JPY">🇯🇵 JPY — 日本円 (¥)</option>
+            <option value="KRW">🇰🇷 KRW — 한국 원 (₩)</option>
+            <option value="HKD">🇭🇰 HKD — 港幣 (HK$)</option>
+            <option value="TWD">🇹🇼 TWD — 新台幣 (NT$)</option>
+            <option value="SGD">🇸🇬 SGD — Singapore Dollar (S$)</option>
+            <option value="MYR">🇲🇾 MYR — Ringgit (RM)</option>
+            <option value="THB">🇹🇭 THB — บาท (฿)</option>
+            <option value="IDR">🇮🇩 IDR — Rupiah (Rp)</option>
+            <option value="VND">🇻🇳 VND — Đồng (₫)</option>
+            <option value="PHP">🇵🇭 PHP — Peso (₱)</option>
+            <option value="INR">🇮🇳 INR — Rupee (₹)</option>
+            <option value="AUD">🇦🇺 AUD — Aussie Dollar (A$)</option>
+            <option value="NZD">🇳🇿 NZD — NZ Dollar (NZ$)</option>
+            <option value="CAD">🇨🇦 CAD — Can Dollar (C$)</option>
+            <option value="CHF">🇨🇭 CHF — Swiss Franc</option>
+            <option value="SEK">🇸🇪 SEK — Krona (kr)</option>
+            <option value="NOK">🇳🇴 NOK — Krone (kr)</option>
+            <option value="DKK">🇩🇰 DKK — Krone (kr)</option>
+            <option value="RUB">🇷🇺 RUB — ₽</option>
+            <option value="BRL">🇧🇷 BRL — Real (R$)</option>
+            <option value="MXN">🇲🇽 MXN — Peso (Mex$)</option>
+            <option value="ARS">🇦🇷 ARS — Peso (AR$)</option>
+            <option value="ZAR">🇿🇦 ZAR — Rand (R)</option>
+            <option value="EGP">🇪🇬 EGP — E£</option>
+            <option value="AED">🇦🇪 AED — درهم إماراتي</option>
+            <option value="SAR">🇸🇦 SAR — ﷼</option>
+            <option value="TRY">🇹🇷 TRY — Türk Lirası (₺)</option>
+            <option value="PLN">🇵🇱 PLN — złoty (zł)</option>
+            <option value="CZK">🇨🇿 CZK — koruna (Kč)</option>
+            <option value="HUF">🇭🇺 HUF — forint (Ft)</option>
+            <option value="ILS">🇮🇱 ILS — Shekel (₪)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-title">🗺️ Trip Setup · 行程设置</div>
+
+      <div class="form-group">
+        <label>Cities · 目标城市 <span class="hint">Separate with comma · 多个城市逗号分隔</span></label>
+        <input type="text" id="cities" placeholder="e.g. 北京, 西安, 成都 / Beijing, Xi'an, Chengdu" value="北京">
+      </div>
+
+      <div class="row">
+        <div class="form-group">
+          <label>Days · 天数</label>
+          <input type="number" id="days" min="1" max="30" value="5">
+        </div>
+        <div class="form-group">
+          <label>Budget Level · 预算等级</label>
+          <select id="budget">
+            <option value="Backpacker (under ¥200/day)">🎒 Backpacker 穷游</option>
+            <option value="Economy (¥200-500/day)" selected>💵 Economy 经济</option>
+            <option value="Comfort (¥500-1000/day)">💴 Comfort 舒适</option>
+            <option value="Luxury (over ¥1000/day)">💎 Luxury 豪华</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="budgetConvert" class="budget-convert-hint"></div>
+
+      <div class="form-group">
+        <label>Interests · 兴趣方向 <span class="hint">Click to select · 点击多选</span></label>
+        <div class="chips" id="interests">
+          <div class="chip active" data-value="Landmarks & UNESCO">🏛️ Landmarks/UNESCO 历史地标</div>
+          <div class="chip active" data-value="Food & Street Food">🍜 Food 美食</div>
+          <div class="chip active" data-value="Photo Spots">📸 Photo Spots 网红打卡</div>
+          <div class="chip" data-value="Nature & Scenery">🏔️ Nature 自然风光</div>
+          <div class="chip" data-value="Night Markets">🌙 Night Markets 夜市</div>
+          <div class="chip" data-value="Shopping">🛍️ Shopping 购物</div>
+          <div class="chip" data-value="Art Museums">🎨 Museums 博物馆</div>
+          <div class="chip" data-value="City Skyline Views">🌃 Skyline Views 夜景天际线</div>
+          <div class="chip" data-value="Temples">⛩️ Temples 寺庙</div>
+          <div class="chip" data-value="Street Life & Markets">🚶 Street Life 市井生活</div>
+          <div class="chip" data-value="Futuristic & Modern">🚀 Futuristic 未来科技</div>
+          <div class="chip" data-value="Outdoor">🥾 Outdoor 户外</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Travel Style · 旅行节奏</label>
+        <select id="travelStyle">
+          <option value="Check-in rush (max spots)">⚡ Check-in rush 打卡狂魔</option>
+          <option value="Balanced" selected>🎯 Balanced 平衡型</option>
+          <option value="Slow & Relaxed">☕ Slow & Relaxed 慢游型</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Dietary · 饮食要求 <span class="hint">Optional · 选填</span></label>
+        <input type="text" id="dietary" placeholder="e.g. Vegetarian, no pork, halal, no spicy, etc.">
+      </div>
+
+      <div class="form-group">
+        <label>Notes · 补充说明 <span class="hint">Optional · 选填</span></label>
+        <textarea id="notes" placeholder="e.g. traveling with seniors, need wheelchair access, must see Giant Panda, etc."></textarea>
+      </div>
+
+      <button class="btn" id="generateBtn">✨ Generate Travel Guide (.doc) · 生成攻略并下载</button>
+
+      <div class="status" id="status">
+        <span class="spinner"></span>
+        <span id="statusText">Reading knowledge base + AI writing (insider tips + restaurants + timeline)... please wait 60-90s (读取知识库 + AI 生成中，内容更丰富约需 60-90 秒...)</span>
+      </div>
+
+      <div class="error" id="error"></div>
+    </div>
+  </div>
+
+  <footer>
+    Feishu Knowledge Base + DeepSeek AI · Powered by Trae
+  </footer>
+
+<script>
+  // 语言 → 默认货币映射（选语言时自动联动）
+  const LANG_DEFAULT_CURRENCY = {
+    '中文': 'CNY',
+    '中文(繁体)': 'TWD',
+    'English': 'USD',
+    'English (UK)': 'GBP',
+    'English (AU)': 'AUD',
+    'English (CA)': 'CAD',
+    '日本語': 'JPY',
+    '한국어': 'KRW',
+    'Français': 'EUR',
+    'Deutsch': 'EUR',
+    'Español': 'EUR',
+    'Español (MX)': 'MXN',
+    'Italiano': 'EUR',
+    'Português': 'EUR',
+    'Português (BR)': 'BRL',
+    'Русский': 'RUB',
+    'ไทย': 'THB',
+    'Tiếng Việt': 'VND',
+    'Bahasa Indonesia': 'IDR',
+    'Bahasa Melayu': 'MYR',
+    'Filipino': 'PHP',
+    'हिन्दी': 'INR',
+    'العربية': 'AED',
+    'Türkçe': 'TRY'
+  };
+
+  // 语言联动货币
+  document.getElementById('language').addEventListener('change', (e) => {
+    const cur = LANG_DEFAULT_CURRENCY[e.target.value];
+    if (cur) {
+      document.getElementById('currency').value = cur;
+      updateBudgetHint();
+    }
+  });
+  document.getElementById('currency').addEventListener('change', updateBudgetHint);
+  document.getElementById('days').addEventListener('input', updateBudgetHint);
+  document.getElementById('budget').addEventListener('change', updateBudgetHint);
+
+  // 汇率表（与后端保持一致，前端只用于显示换算提示）
+  // 1 CNY = X 外币
+  const RATES = { CNY:1, USD:0.138, EUR:0.126, GBP:0.108, JPY:21.5, KRW:192, HKD:1.08, TWD:4.45, SGD:0.185, MYR:0.645, THB:4.72, IDR:2180, VND:3450, PHP:7.72, INR:11.5, AUD:0.212, NZD:0.228, CAD:0.188, CHF:0.122, SEK:1.45, NOK:1.42, DKK:0.94, RUB:13.2, BRL:0.70, MXN:2.35, ARS:185, ZAR:2.55, EGP:4.25, AED:0.507, SAR:0.518, TRY:4.65, PLN:0.55, CZK:3.15, HUF:48.5, ILS:0.50 };
+
+  function cnyToOther(cny, code) {
+    return cny * (RATES[code] ?? 1);
+  }
+  function fmt(n, code) {
+    const noDec = ['JPY','KRW','IDR','VND','HUF','ARS'].includes(code);
+    const num = noDec ? Math.round(n) : (n >= 1000 ? Math.round(n) : Math.round(n*100)/100);
+    return new Intl.NumberFormat('en-US').format(num) + ' ' + code;
+  }
+
+  // 预算等级 → 每日人民币中位数
+  const BUDGET_CNY_DAY = {
+    'Backpacker (under ¥200/day)': 200,
+    'Economy (¥200-500/day)': 350,
+    'Comfort (¥500-1000/day)': 750,
+    'Luxury (over ¥1000/day)': 1500
+  };
+
+  function updateBudgetHint() {
+    const budgetSel = document.getElementById('budget').value;
+    const days = Math.max(1, parseInt(document.getElementById('days').value) || 1);
+    const cur = document.getElementById('currency').value;
+    const cnyDay = BUDGET_CNY_DAY[budgetSel] ?? 350;
+    const cnyTotal = cnyDay * days;
+    const targetDay = cnyToOther(cnyDay, cur);
+    const targetTotal = cnyToOther(cnyTotal, cur);
+    const cnyStr = new Intl.NumberFormat('zh-CN').format(cnyTotal);
+    document.getElementById('budgetConvert').innerHTML =
+      `🔄 参考换算：约 <b>${fmt(targetDay, cur)}</b>/天 → 全程约 <b>${fmt(targetTotal, cur)}</b> （≈ ¥${cnyStr} CNY total）`;
+  }
+  updateBudgetHint();
+
+  // 兴趣标签多选
+  document.querySelectorAll('#interests .chip').forEach(chip => {
+    chip.addEventListener('click', () => chip.classList.toggle('active'));
+  });
+
+  // 后端 API 地址：同源访问时留空
+  const API_URL = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
+    ? ''
+    : 'http://localhost:3000';
+
+  document.getElementById('generateBtn').addEventListener('click', async () => {
+    const cities = document.getElementById('cities').value.trim()
+      .split(/[,，]/).map(s => s.trim()).filter(Boolean);
+    const days = parseInt(document.getElementById('days').value);
+    const budget = document.getElementById('budget').value;
+    const interests = [...document.querySelectorAll('#interests .chip.active')]
+      .map(c => c.dataset.value);
+    const travelStyle = document.getElementById('travelStyle').value;
+    const language = document.getElementById('language').value;
+    const currency = document.getElementById('currency').value;
+    const dietary = document.getElementById('dietary').value.trim();
+    const notes = document.getElementById('notes').value.trim();
+
+    if (cities.length === 0) { showError('请填写目标城市 / Please enter cities'); return; }
+    if (interests.length === 0) { showError('请至少选择一个兴趣 / Please select at least 1 interest'); return; }
+
+    const preferences = { cities, days, budget, interests, travelStyle, language, currency, dietary, notes };
+
+    const btn = document.getElementById('generateBtn');
+    const status = document.getElementById('status');
+    const errorEl = document.getElementById('error');
+    btn.disabled = true;
+    status.classList.add('show');
+    errorEl.classList.remove('show');
+
+    try {
+      const res = await fetch(`${API_URL}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preferences, format: 'doc' })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Request failed 请求失败' }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const cd = res.headers.get('Content-Disposition') || '';
+      const m = cd.match(/filename="?(.+?)"?(?:;|$)/);
+      a.download = m ? decodeURIComponent(m[1]) : `${cities.join('-')}-travel-guide-${currency}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      btn.disabled = false;
+      status.classList.remove('show');
+    }
+  });
+
+  function showError(msg) {
+    const el = document.getElementById('error');
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+</script>
+</body>
+</html>

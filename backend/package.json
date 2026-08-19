@@ -1,0 +1,14 @@
+{
+  "name": "travel-guide-backend",
+  "version": "1.0.0",
+  "description": "中国旅行攻略生成器后端 - 飞书知识库 + DeepSeek + .doc 输出",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}
