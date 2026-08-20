@@ -3,202 +3,384 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>China Travel Guide Generator · 中国旅行攻略生成器</title>
+<title>China Travel Guide · 中国旅行攻略生成器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Noto+Sans+SC:wght@400;500;600;700&family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --primary: #c0392b;
-    --primary-dark: #922b21;
-    --accent: #e67e22;
-    --bg: #faf6f0;
-    --card: #ffffff;
-    --text: #2c3e50;
-    --muted: #7f8c8d;
-    --border: #e8e0d4;
-    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  /* ============================================================
+     中国风美学：朱红 + 米黄 + 水墨青
+     字体：Noto Serif SC (中文衬线，标题) | Noto Sans SC (中文正文)
+            Playfair Display (英文标题) | Inter (英文正文)
+     ============================================================ */
+  :root{
+    --cinnabar:#9B2335;         /* 朱红 */
+    --cinnabar-dark:#7a1b2b;    /* 深朱红 */
+    --gold:#C9A86C;             /* 描金 */
+    --gold-light:#E3CFA5;       /* 浅金 */
+    --paper:#F5EFE0;            /* 宣纸米黄 */
+    --paper-dark:#EADFC7;       /* 深宣纸 */
+    --ink:#242019;              /* 墨黑 */
+    --ink-soft:#4A4238;         /* 墨灰 */
+    --ink-muted:#7A7267;        /* 墨淡 */
+    --jade:#5A7A6A;             /* 玉色 */
+    --divider:#D6C8A6;
+    --card:#FBF7EC;
+    --shadow-soft:0 1px 2px rgba(36,32,25,.05), 0 8px 24px -8px rgba(155,35,53,.12);
+    --shadow-card:0 2px 4px rgba(36,32,25,.04), 0 20px 48px -18px rgba(155,35,53,.18);
+    --radius-lg:16px;
+    --radius-md:10px;
+    --radius-sm:6px;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    min-height: 100vh;
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--paper);color:var(--ink);line-height:1.65;min-height:100vh;
+    font-family:"Noto Sans SC","Inter",system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(circle at 10% 0%, rgba(201,168,108,.10) 0, transparent 45%),
+      radial-gradient(circle at 90% 8%, rgba(155,35,53,.08) 0, transparent 45%);
+    background-attachment: fixed;
   }
-  .hero {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    color: white;
-    padding: 48px 24px 40px;
-    text-align: center;
+
+  /* ---------- HERO ---------- */
+  .hero{
+    position:relative;
+    padding:72px 24px 88px;
+    text-align:center;
+    color:var(--paper);
+    background:
+      linear-gradient(135deg, var(--cinnabar) 0%, var(--cinnabar-dark) 50%, #5d1420 100%);
+    overflow:hidden;
+    border-bottom:3px solid var(--gold);
   }
-  .hero h1 { font-size: 28px; margin-bottom: 8px; letter-spacing: 0.5px; }
-  .hero p { opacity: 0.92; font-size: 15px; }
-  .hero .subtag {
-    margin-top: 12px;
-    font-size: 13px;
-    opacity: 0.75;
+  .hero::before{
+    content:"";
+    position:absolute; inset:0;
+    background:
+      radial-gradient(circle at 20% 80%, rgba(201,168,108,.18) 0, transparent 40%),
+      radial-gradient(circle at 80% 20%, rgba(227,207,165,.12) 0, transparent 45%);
+    pointer-events:none;
   }
-  .container {
-    max-width: 760px;
-    margin: -24px auto 48px;
-    padding: 0 20px;
+  .hero::after{
+    content:"";
+    position:absolute; left:50%; bottom:-24px;
+    transform:translateX(-50%);
+    width:48px; height:48px;
+    background:var(--paper);
+    border:3px solid var(--gold);
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 4px 18px rgba(0,0,0,.22);
   }
-  .card {
-    background: var(--card);
-    border-radius: 12px;
-    box-shadow: var(--shadow);
-    padding: 32px;
-    margin-bottom: 20px;
+  .hero-inner{position:relative;z-index:1;max-width:780px;margin:0 auto;}
+  .hero-seal{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:6px 14px;
+    background:rgba(201,168,108,.18);
+    border:1px solid rgba(227,207,165,.45);
+    border-radius:999px;
+    font-size:12px; letter-spacing:1.8px;
+    margin-bottom:20px;
+    color:var(--gold-light);
+    text-transform:uppercase;
+    font-family:"Inter",sans-serif;
   }
-  .section-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--primary-dark);
-    margin-bottom: 18px;
-    padding-bottom: 8px;
-    border-bottom: 1.5px dashed var(--border);
+  .hero h1{
+    font-family:"Playfair Display","Noto Serif SC",serif;
+    font-weight:900;
+    font-size:clamp(30px,4.6vw,52px);
+    line-height:1.1;
+    letter-spacing:0.5px;
+    margin-bottom:14px;
+    text-shadow:0 2px 18px rgba(0,0,0,.22);
   }
-  .form-group { margin-bottom: 20px; }
-  label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: 8px;
-    font-size: 14px;
-    color: var(--text);
+  .hero h1 .cn{font-family:"Noto Serif SC",serif;display:block;font-size:.55em;font-weight:700;letter-spacing:6px;margin-top:6px;opacity:.96;}
+  .hero-sub{
+    font-family:"Inter","Noto Sans SC",sans-serif;
+    font-size:15px; opacity:.94; margin-bottom:10px;
   }
-  label .hint { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 6px; }
-  input[type="text"], input[type="number"], select, textarea {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1.5px solid var(--border);
-    border-radius: 8px;
-    font-size: 14px;
-    font-family: inherit;
-    background: #fdfdfd;
-    transition: border-color 0.2s;
+  .hero-tags{
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+    margin-top:18px;
   }
-  input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: var(--primary);
+  .hero-tag{
+    padding:6px 14px;
+    font-size:12px;
+    background:rgba(251,247,236,.08);
+    border:1px solid rgba(227,207,165,.35);
+    border-radius:999px;
+    color:var(--gold-light);
+    backdrop-filter: blur(2px);
   }
-  textarea { resize: vertical; min-height: 70px; }
-  .row { display: flex; gap: 16px; flex-wrap: wrap; }
-  .row .form-group { flex: 1; min-width: 140px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chip {
-    padding: 6px 14px;
-    border: 1.5px solid var(--border);
-    border-radius: 20px;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s;
-    user-select: none;
-    background: #fdfdfd;
+
+  /* ---------- LAYOUT ---------- */
+  .container{max-width:860px;margin:-36px auto 56px;padding:0 20px;position:relative;z-index:2;}
+
+  /* ---------- CARD ---------- */
+  .card{
+    background:var(--card);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    padding:40px 36px;
+    margin-bottom:22px;
+    border:1px solid var(--divider);
+    position:relative;
   }
-  .chip:hover { border-color: var(--primary); }
-  .chip.active {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
+  .card::before{
+    content:"";
+    position:absolute;
+    top:14px; left:14px; right:14px; bottom:14px;
+    border:1px solid rgba(201,168,108,.35);
+    border-radius:calc(var(--radius-lg) - 6px);
+    pointer-events:none;
   }
-  .budget-convert-hint {
-    margin-top: 6px;
-    font-size: 12px;
-    color: var(--muted);
-    line-height: 1.5;
+
+  .section-title{
+    font-family:"Noto Serif SC","Playfair Display",serif;
+    font-size:18px; font-weight:700;
+    color:var(--cinnabar-dark);
+    margin-bottom:22px;
+    padding-bottom:12px;
+    display:flex; align-items:center; gap:10px;
+    border-bottom:1px dashed var(--divider);
   }
-  .budget-convert-hint b { color: var(--primary-dark); }
-  .btn {
-    display: block;
-    width: 100%;
-    padding: 14px;
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s;
-    margin-top: 8px;
+  .section-title::before{
+    content:"";
+    display:inline-block; width:6px; height:24px;
+    background:linear-gradient(180deg,var(--cinnabar),var(--gold));
+    border-radius:2px;
   }
-  .btn:hover:not(:disabled) { background: var(--primary-dark); }
-  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-  .status {
-    text-align: center;
-    padding: 16px;
-    color: var(--muted);
-    font-size: 14px;
-    display: none;
+  .section-title .en{
+    margin-left:auto;
+    font-family:"Inter",serif;
+    font-size:12px;
+    font-weight:500;
+    letter-spacing:1.2px;
+    color:var(--ink-muted);
+    text-transform:uppercase;
   }
-  .status.show { display: block; }
-  .status .spinner {
-    display: inline-block;
-    width: 18px; height: 18px;
-    border: 2.5px solid var(--border);
-    border-top-color: var(--primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-right: 8px;
-    vertical-align: middle;
+
+  /* ---------- FORM ---------- */
+  .form-group{margin-bottom:20px;}
+  label{
+    display:block;
+    font-weight:600;
+    margin-bottom:8px;
+    font-size:14px;
+    color:var(--ink-soft);
+    font-family:"Noto Sans SC",sans-serif;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .error {
-    background: #fdecea;
-    color: var(--primary-dark);
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-size: 14px;
-    margin-top: 16px;
-    display: none;
+  label .hint{font-weight:400;color:var(--ink-muted);font-size:12px;margin-left:6px;}
+  label .zh{font-weight:400;color:var(--ink-muted);font-size:12px;margin-left:4px;}
+  input[type="text"], input[type="email"], input[type="number"], input[type="date"], select, textarea{
+    width:100%;
+    padding:11px 14px;
+    border:1.5px solid var(--divider);
+    border-radius:var(--radius-md);
+    font-size:14px;
+    font-family:"Noto Sans SC","Inter",sans-serif;
+    background:#fffdf5;
+    color:var(--ink);
+    transition:border-color .2s, box-shadow .2s, background .2s;
   }
-  .error.show { display: block; }
-  .email-success {
-    background: #e8f8ef;
-    color: #1e7e4b;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-size: 14px;
-    margin-top: 16px;
-    display: none;
+  input:focus, select:focus, textarea:focus{
+    outline:none;
+    border-color:var(--cinnabar);
+    box-shadow:0 0 0 3px rgba(155,35,53,.08);
+    background:#fff;
   }
-  .email-success.show { display: block; }
-  .email-warn {
-    background: #fff6e5;
-    color: #926b21;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-size: 14px;
-    margin-top: 16px;
-    display: none;
+  textarea{resize:vertical;min-height:72px;}
+
+  .row{display:flex; gap:16px; flex-wrap:wrap;}
+  .row .form-group{flex:1; min-width:150px;}
+
+  /* ---------- CHIPS ---------- */
+  .chips{display:flex; flex-wrap:wrap; gap:8px;}
+  .chip{
+    padding:7px 14px;
+    border:1.5px solid var(--divider);
+    border-radius:20px;
+    font-size:13px;
+    cursor:pointer;
+    transition:all .18s;
+    user-select:none;
+    background:#fffdf5;
+    color:var(--ink-soft);
+    font-weight:500;
   }
-  .email-warn.show { display: block; }
-  footer {
-    text-align: center;
-    color: var(--muted);
-    font-size: 12px;
-    padding: 24px;
+  .chip:hover{border-color:var(--cinnabar); color:var(--cinnabar);}
+  .chip.active{
+    background:var(--cinnabar);
+    color:#fff;
+    border-color:var(--cinnabar);
+    box-shadow:0 2px 8px rgba(155,35,53,.22);
   }
-  .flag {
-    display: inline-block;
-    margin-right: 6px;
+
+  /* ---------- BUDGET HINT ---------- */
+  .budget-convert-hint{
+    margin-top:4px;
+    font-size:12.5px;
+    color:var(--ink-muted);
+    line-height:1.6;
+    padding:10px 14px;
+    background:rgba(201,168,108,.08);
+    border:1px dashed rgba(201,168,108,.35);
+    border-radius:var(--radius-sm);
+  }
+  .budget-convert-hint b{color:var(--cinnabar-dark);}
+
+  /* ---------- BUTTON ---------- */
+  .btn{
+    display:block;
+    width:100%;
+    padding:16px 18px;
+    background:linear-gradient(135deg, var(--cinnabar) 0%, var(--cinnabar-dark) 100%);
+    color:var(--paper);
+    border:none;
+    border-radius:var(--radius-md);
+    font-size:16px;
+    font-weight:700;
+    cursor:pointer;
+    transition:transform .15s, box-shadow .2s, filter .2s;
+    margin-top:8px;
+    font-family:"Noto Sans SC","Inter",sans-serif;
+    letter-spacing:.5px;
+    box-shadow:0 8px 22px -8px rgba(155,35,53,.55);
+    position:relative;
+    overflow:hidden;
+  }
+  .btn::after{
+    content:"";
+    position:absolute; inset:0;
+    background:linear-gradient(135deg,transparent 30%,rgba(251,247,236,.12) 50%,transparent 70%);
+    transform:translateX(-100%);
+    transition:transform .5s;
+  }
+  .btn:hover:not(:disabled){
+    transform:translateY(-1px);
+    box-shadow:0 12px 28px -8px rgba(155,35,53,.65);
+    filter:brightness(1.05);
+  }
+  .btn:hover:not(:disabled)::after{transform:translateX(100%);}
+  .btn:active:not(:disabled){transform:translateY(0);}
+  .btn:disabled{opacity:.62;cursor:not-allowed;}
+
+  /* ---------- STATUS ---------- */
+  .status{
+    text-align:center;
+    padding:14px 16px;
+    color:var(--ink-muted);
+    font-size:13.5px;
+    display:none;
+    background:rgba(90,122,106,.07);
+    border:1px dashed rgba(90,122,106,.25);
+    border-radius:var(--radius-md);
+    margin-top:18px;
+    line-height:1.6;
+  }
+  .status.show{display:block;}
+  .status .spinner{
+    display:inline-block;
+    width:16px; height:16px;
+    border:2.5px solid var(--divider);
+    border-top-color:var(--cinnabar);
+    border-radius:50%;
+    animation:spin .8s linear infinite;
+    margin-right:8px;
+    vertical-align:middle;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .error{
+    background:#fbe6e3;
+    color:var(--cinnabar-dark);
+    padding:12px 16px;
+    border-radius:var(--radius-md);
+    font-size:14px;
+    margin-top:16px;
+    display:none;
+    border:1px solid #f0c9c3;
+  }
+  .error.show{display:block;}
+  .email-success{
+    background:#e8f4ed;
+    color:#205e3d;
+    padding:12px 16px;
+    border-radius:var(--radius-md);
+    font-size:14px;
+    margin-top:16px;
+    display:none;
+    border:1px solid #c2e1d0;
+  }
+  .email-success.show{display:block;}
+  .email-warn{
+    background:#fff2d6;
+    color:#8a6616;
+    padding:12px 16px;
+    border-radius:var(--radius-md);
+    font-size:14px;
+    margin-top:16px;
+    display:none;
+    border:1px solid #f0dca3;
+  }
+  .email-warn.show{display:block;}
+
+  /* ---------- FOOTER ---------- */
+  footer{
+    text-align:center;
+    color:var(--ink-muted);
+    font-size:12.5px;
+    padding:16px 24px 40px;
+    letter-spacing:.4px;
+  }
+  footer .divider{
+    display:block; margin:0 auto 14px;
+    width:40px; height:1px;
+    background:var(--divider);
+  }
+
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width:640px){
+    .hero{padding:54px 18px 72px;}
+    .container{padding:0 14px; margin-top:-32px;}
+    .card{padding:28px 20px;}
+    .row{gap:10px;}
+    .row .form-group{min-width:130px;}
+    .hero-tags{gap:6px;}
+    .hero-tag{padding:5px 11px; font-size:11.5px;}
   }
 </style>
 </head>
 <body>
   <div class="hero">
-    <h1>🧭 China Travel Guide Generator</h1>
-    <p>📸 Check-in first · 🏨 Hotel advice · 🧭 Navigation · 💰 Auto currency convert · 🌍 23 languages</p>
-    <div class="subtag">本地人数据 + AI · 一键下载 Word 攻略</div>
+    <div class="hero-inner">
+      <div class="hero-seal">🐼 China · 24 Languages · Auto Currency · Email Delivery</div>
+      <h1>
+        Your China Adventure
+        <span class="cn">中 国 旅 行 攻 略 · 生 成 器</span>
+      </h1>
+      <p class="hero-sub">飞书知识库 + DeepSeek AI · 生成可下载的 Word 攻略</p>
+      <div class="hero-tags">
+        <span class="hero-tag">📸 Instagrammable Spots</span>
+        <span class="hero-tag">🏨 Hotel Suggestions</span>
+        <span class="hero-tag">🚇 Route & Transit Time</span>
+        <span class="hero-tag">💰 35 Currencies Auto Convert</span>
+        <span class="hero-tag">📧 Email You the .doc</span>
+      </div>
+    </div>
   </div>
 
   <div class="container">
     <div class="card">
 
-      <div class="section-title">🌍 Language & Currency · 语言与货币</div>
+      <div class="section-title">
+        Language & Currency · 语言与货币
+        <span class="en">① Preferences</span>
+      </div>
 
       <div class="row">
         <div class="form-group">
-          <label>Guide Language · 攻略语言 <span class="hint">All content except addresses</span></label>
+          <label>Guide Language · 攻略语言<span class="zh">(地址中文，其余用该语言)</span></label>
           <select id="language">
             <option value="English" selected>🇺🇸 English (US)</option>
             <option value="English (UK)">🇬🇧 English (UK)</option>
@@ -227,7 +409,7 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Currency · 货币单位 <span class="hint">All prices auto converted</span></label>
+          <label>Currency · 货币单位<span class="hint">All prices auto converted</span></label>
           <select id="currency">
             <option value="USD">🇺🇸 USD — US Dollar ($)</option>
             <option value="CNY">🇨🇳 CNY — 人民币 (¥)</option>
@@ -255,7 +437,7 @@
             <option value="BRL">🇧🇷 BRL — Real (R$)</option>
             <option value="MXN">🇲🇽 MXN — Peso (Mex$)</option>
             <option value="ARS">🇦🇷 ARS — Peso (AR$)</option>
-            <option value="ZAR">🇿🇦 ZAR — Rand (R)</option>
+            <option value="ZAF">🇿🇦 ZAR — Rand (R)</option>
             <option value="EGP">🇪🇬 EGP — E£</option>
             <option value="AED">🇦🇪 AED — درهم إماراتي</option>
             <option value="SAR">🇸🇦 SAR — ﷼</option>
@@ -268,20 +450,40 @@
         </div>
       </div>
 
-      <div class="section-title">🗺️ Trip Setup · 行程设置</div>
+      <div class="section-title" style="margin-top:28px;">
+        Trip Setup · 行程设置
+        <span class="en">② Itinerary</span>
+      </div>
 
       <div class="form-group">
-        <label>Cities · 目标城市 <span class="hint">Separate with comma · 多个城市逗号分隔</span></label>
+        <label>Cities · 目标城市 <span class="hint">多个用逗号分隔 / Multi-city: comma separated</span></label>
         <input type="text" id="cities" placeholder="e.g. 北京, 西安, 成都 / Beijing, Xi'an, Chengdu" value="北京">
       </div>
 
       <div class="row">
         <div class="form-group">
-          <label>Days · 天数</label>
+          <label>Days · 行程天数</label>
           <input type="number" id="days" min="1" max="30" value="5">
         </div>
         <div class="form-group">
-          <label>Budget Level · 预算等级</label>
+          <label>Travelers · 出行人数</label>
+          <select id="travelers">
+            <option value="1">👤 Solo 独自</option>
+            <option value="2" selected>👥 Couple 情侣/双人</option>
+            <option value="3-4">👨‍👩‍👧 Family (3-4) 小家庭</option>
+            <option value="5-8">👨‍👩‍👧‍👦 Family (5-8) 大家庭</option>
+            <option value="9+">👥 Group (9+) 朋友团</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="form-group">
+          <label>Arrival Date · 出发日期<span class="hint">用于判断穿衣 & 节日</span></label>
+          <input type="date" id="arrivalDate">
+        </div>
+        <div class="form-group">
+          <label>Budget · 预算等级</label>
           <select id="budget">
             <option value="Backpacker (under ¥200/day)">🎒 Backpacker 穷游</option>
             <option value="Economy (¥200-500/day)" selected>💵 Economy 经济</option>
@@ -293,21 +495,26 @@
 
       <div id="budgetConvert" class="budget-convert-hint"></div>
 
-      <div class="form-group">
-        <label>Interests · 兴趣方向 <span class="hint">Click to select · 点击多选</span></label>
-        <div class="chips" id="interests">
-          <div class="chip active" data-value="Landmarks & UNESCO">🏛️ Landmarks/UNESCO 历史地标</div>
-          <div class="chip active" data-value="Food & Street Food">🍜 Food 美食</div>
-          <div class="chip active" data-value="Photo Spots">📸 Photo Spots 网红打卡</div>
-          <div class="chip" data-value="Nature & Scenery">🏔️ Nature 自然风光</div>
-          <div class="chip" data-value="Night Markets">🌙 Night Markets 夜市</div>
-          <div class="chip" data-value="Shopping">🛍️ Shopping 购物</div>
-          <div class="chip" data-value="Art Museums">🎨 Museums 博物馆</div>
-          <div class="chip" data-value="City Skyline Views">🌃 Skyline Views 夜景天际线</div>
-          <div class="chip" data-value="Temples">⛩️ Temples 寺庙</div>
-          <div class="chip" data-value="Street Life & Markets">🚶 Street Life 市井生活</div>
-          <div class="chip" data-value="Futuristic & Modern">🚀 Futuristic 未来科技</div>
-          <div class="chip" data-value="Outdoor">🥾 Outdoor 户外</div>
+      <div class="row" style="margin-top:6px;">
+        <div class="form-group">
+          <label>Hotel · 住宿偏好</label>
+          <select id="hotelPref">
+            <option value="Balanced (mix)" selected>🎯 Balanced 混合型</option>
+            <option value="Budget hostels & guesthouses (under $50)">🏠 Budget 青旅/民宿（省）</option>
+            <option value="3-4★ business hotels ($50-150)">🏨 3-4★ 商务连锁（稳）</option>
+            <option value="5★ luxury &amp; heritage ($200+)">👑 5★ 豪华/国宾馆（奢）</option>
+            <option value="Boutique &amp; design hotels">🎨 Boutique 设计型精品酒店</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Transport · 交通偏好</label>
+          <select id="transportPref">
+            <option value="Balanced (metro + taxi + high-speed rail)" selected>🎯 Balanced 综合推荐</option>
+            <option value="Public transit only (metro / bus)">🚇 只坐公共交通（省钱）</option>
+            <option value="Taxi / DiDi preferred (max convenience)">🚕 优先打车/滴滴（省心）</option>
+            <option value="High-speed rail for every city-hop">🚄 跨城全部高铁（不坐飞机）</option>
+            <option value="Flight for long-haul city-hop">✈️ 长途跨城优先飞机</option>
+          </select>
         </div>
       </div>
 
@@ -321,101 +528,110 @@
       </div>
 
       <div class="form-group">
-        <label>Dietary · 饮食要求 <span class="hint">Optional · 选填</span></label>
-        <input type="text" id="dietary" placeholder="e.g. Vegetarian, no pork, halal, no spicy, etc.">
+        <label>Interests · 兴趣方向<span class="hint">可多选 / Click to multi-select</span></label>
+        <div class="chips" id="interests">
+          <div class="chip active" data-value="Landmarks & UNESCO">🏛️ Landmarks/UNESCO 历史地标</div>
+          <div class="chip active" data-value="Food & Street Food">🍜 Food 美食</div>
+          <div class="chip active" data-value="Photo Spots">📸 Photo Spots 网红打卡</div>
+          <div class="chip" data-value="Nature & Scenery">🏔️ Nature 自然风光</div>
+          <div class="chip" data-value="Night Markets">🌙 Night Markets 夜市</div>
+          <div class="chip" data-value="Shopping">🛍️ Shopping 购物</div>
+          <div class="chip" data-value="Art Museums">🎨 Museums 博物馆</div>
+          <div class="chip" data-value="City Skyline Views">🌃 Skyline Views 夜景天际线</div>
+          <div class="chip" data-value="Temples">⛩️ Temples 寺庙</div>
+          <div class="chip" data-value="Street Life & Markets">🚶 Street Life 市井生活</div>
+          <div class="chip" data-value="Futuristic & Modern">🚀 Futuristic 未来科技</div>
+          <div class="chip" data-value="Pandas & Wildlife">🐼 Pandas 熊猫/动物</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="form-group">
+          <label>Dietary · 饮食要求<span class="hint">Optional · 选填</span></label>
+          <input type="text" id="dietary" placeholder="e.g. Vegetarian, no pork, halal, no spicy, etc.">
+        </div>
+        <div class="form-group">
+          <label>First Landing City · 入境/第一站城市<span class="hint">用于落地流程建议</span></label>
+          <input type="text" id="firstCity" placeholder="e.g. 北京 PEK / 上海 PVG / 成都 CTU">
+        </div>
       </div>
 
       <div class="form-group">
-        <label>Notes · 补充说明 <span class="hint">Optional · 选填</span></label>
-        <textarea id="notes" placeholder="e.g. traveling with seniors, need wheelchair access, must see Giant Panda, etc."></textarea>
+        <label>Notes · 补充说明<span class="hint">Optional · 选填</span></label>
+        <textarea id="notes" placeholder="e.g. traveling with seniors, must see Giant Panda, wheelchair access, anniversary trip, etc."></textarea>
       </div>
 
-      <div class="section-title" style="margin-top:8px;">📧 Email · 接收邮箱</div>
+      <div class="section-title" style="margin-top:28px;">
+        Email Delivery · 接收邮箱
+        <span class="en">③ Deliver to</span>
+      </div>
       <div class="form-group">
-        <label>Receive via Email · 发送到邮箱 <span class="hint">Optional · 选填，留空则直接下载</span></label>
-        <input type="email" id="email" placeholder="your@email.com — 生成后会把攻略.doc 作为附件发到这个邮箱">
+        <label>Your Email · 发送到此邮箱<span class="hint">选填 · 留空仅下载；填了就下载 + 同时发邮件</span></label>
+        <input type="email" id="email" placeholder="your@email.com — 攻略.doc 会作为附件发送到此邮箱">
       </div>
 
-      <button class="btn" id="generateBtn">✨ Generate Travel Guide (.doc) · 生成攻略并下载 / 发邮件</button>
+      <button class="btn" id="generateBtn">✨ 生成攻略 · Generate Travel Guide & Download / Email</button>
 
       <div class="status" id="status">
         <span class="spinner"></span>
-        <span id="statusText">Reading knowledge base + AI writing (insider tips + restaurants + timeline)... please wait 60-90s (读取知识库 + AI 生成中，内容更丰富约需 60-90 秒...)</span>
+        <span id="statusText">正在读取飞书知识库 + AI 生成攻略（独家点位 + 餐厅 + 高铁/地铁方案 + 入境准备清单），内容较丰富，约 60-120 秒，请稍候 🐼</span>
       </div>
 
       <div class="error" id="error"></div>
-      <div class="email-success" id="emailSuccess">✅ 攻略已发送到您的邮箱，附件中即为 .doc 文件（若未收到请检查垃圾邮件）</div>
+      <div class="email-success" id="emailSuccess">✅ 攻略已发送到您的邮箱，附件中即为 .doc 文件（若没收到请查「垃圾邮件 / Promotions」）</div>
       <div class="email-warn" id="emailWarn"></div>
     </div>
   </div>
 
   <footer>
-    Feishu Knowledge Base + DeepSeek AI · Powered by Trae
+    <span class="divider"></span>
+    Feishu Base · DeepSeek AI · Gmail SMTP · Render 部署 · Made with 🐼 ❤️
   </footer>
 
 <script>
-  // 语言 → 默认货币映射（选语言时自动联动）
+  // -------------------- 语言 → 默认货币 --------------------
   const LANG_DEFAULT_CURRENCY = {
-    '中文': 'CNY',
-    '中文(繁体)': 'TWD',
-    'English': 'USD',
-    'English (UK)': 'GBP',
-    'English (AU)': 'AUD',
-    'English (CA)': 'CAD',
-    '日本語': 'JPY',
-    '한국어': 'KRW',
-    'Français': 'EUR',
-    'Deutsch': 'EUR',
-    'Español': 'EUR',
-    'Español (MX)': 'MXN',
-    'Italiano': 'EUR',
-    'Português': 'EUR',
-    'Português (BR)': 'BRL',
-    'Русский': 'RUB',
-    'ไทย': 'THB',
-    'Tiếng Việt': 'VND',
-    'Bahasa Indonesia': 'IDR',
-    'Bahasa Melayu': 'MYR',
-    'Filipino': 'PHP',
-    'हिन्दी': 'INR',
-    'العربية': 'AED',
-    'Türkçe': 'TRY'
+    '中文':'CNY','中文(繁体)':'TWD','English':'USD','English (UK)':'GBP',
+    'English (AU)':'AUD','English (CA)':'CAD','日本語':'JPY','한국어':'KRW',
+    'Français':'EUR','Deutsch':'EUR','Español':'EUR','Español (MX)':'MXN',
+    'Italiano':'EUR','Português':'EUR','Português (BR)':'BRL','Русский':'RUB',
+    'ไทย':'THB','Tiếng Việt':'VND','Bahasa Indonesia':'IDR','Bahasa Melayu':'MYR',
+    'Filipino':'PHP','हिन्दी':'INR','العربية':'AED','Türkçe':'TRY'
   };
-
-  // 语言联动货币
   document.getElementById('language').addEventListener('change', (e) => {
     const cur = LANG_DEFAULT_CURRENCY[e.target.value];
-    if (cur) {
-      document.getElementById('currency').value = cur;
-      updateBudgetHint();
-    }
+    if (cur) { document.getElementById('currency').value = cur; updateBudgetHint(); }
   });
   document.getElementById('currency').addEventListener('change', updateBudgetHint);
   document.getElementById('days').addEventListener('input', updateBudgetHint);
   document.getElementById('budget').addEventListener('change', updateBudgetHint);
 
-  // 汇率表（与后端保持一致，前端只用于显示换算提示）
-  // 1 CNY = X 外币
-  const RATES = { CNY:1, USD:0.138, EUR:0.126, GBP:0.108, JPY:21.5, KRW:192, HKD:1.08, TWD:4.45, SGD:0.185, MYR:0.645, THB:4.72, IDR:2180, VND:3450, PHP:7.72, INR:11.5, AUD:0.212, NZD:0.228, CAD:0.188, CHF:0.122, SEK:1.45, NOK:1.42, DKK:0.94, RUB:13.2, BRL:0.70, MXN:2.35, ARS:185, ZAR:2.55, EGP:4.25, AED:0.507, SAR:0.518, TRY:4.65, PLN:0.55, CZK:3.15, HUF:48.5, ILS:0.50 };
+  // 出发日期默认 = 今天 + 14 天
+  (function defaultArrivalDate(){
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    const el = document.getElementById('arrivalDate');
+    if (el && !el.value) el.value = `${y}-${m}-${day}`;
+  })();
 
-  function cnyToOther(cny, code) {
-    return cny * (RATES[code] ?? 1);
-  }
-  function fmt(n, code) {
+  // -------------------- 汇率（和后端一致，只做提示展示） --------------------
+  const RATES = { CNY:1, USD:0.138, EUR:0.126, GBP:0.108, JPY:21.5, KRW:192, HKD:1.08, TWD:4.45, SGD:0.185, MYR:0.645, THB:4.72, IDR:2180, VND:3450, PHP:7.72, INR:11.5, AUD:0.212, NZD:0.228, CAD:0.188, CHF:0.122, SEK:1.45, NOK:1.42, DKK:0.94, RUB:13.2, BRL:0.70, MXN:2.35, ARS:185, ZAR:2.55, EGP:4.25, AED:0.507, SAR:0.518, TRY:4.65, PLN:0.55, CZK:3.15, HUF:48.5, ILS:0.50 };
+  function cnyToOther(cny, code){ return cny * (RATES[code] ?? 1); }
+  function fmt(n, code){
     const noDec = ['JPY','KRW','IDR','VND','HUF','ARS'].includes(code);
     const num = noDec ? Math.round(n) : (n >= 1000 ? Math.round(n) : Math.round(n*100)/100);
     return new Intl.NumberFormat('en-US').format(num) + ' ' + code;
   }
-
-  // 预算等级 → 每日人民币中位数
   const BUDGET_CNY_DAY = {
     'Backpacker (under ¥200/day)': 200,
     'Economy (¥200-500/day)': 350,
     'Comfort (¥500-1000/day)': 750,
     'Luxury (over ¥1000/day)': 1500
   };
-
-  function updateBudgetHint() {
+  function updateBudgetHint(){
     const budgetSel = document.getElementById('budget').value;
     const days = Math.max(1, parseInt(document.getElementById('days').value) || 1);
     const cur = document.getElementById('currency').value;
@@ -425,16 +641,15 @@
     const targetTotal = cnyToOther(cnyTotal, cur);
     const cnyStr = new Intl.NumberFormat('zh-CN').format(cnyTotal);
     document.getElementById('budgetConvert').innerHTML =
-      `🔄 参考换算：约 <b>${fmt(targetDay, cur)}</b>/天 → 全程约 <b>${fmt(targetTotal, cur)}</b> （≈ ¥${cnyStr} CNY total）`;
+      `🔄 参考换算 · Estimate：日均 ≈ <b>${fmt(targetDay, cur)}</b> · 全程总计 ≈ <b>${fmt(targetTotal, cur)}</b> （≈ ¥${cnyStr} CNY）`;
   }
   updateBudgetHint();
 
-  // 兴趣标签多选
+  // -------------------- 兴趣多选 --------------------
   document.querySelectorAll('#interests .chip').forEach(chip => {
     chip.addEventListener('click', () => chip.classList.toggle('active'));
   });
 
-  // 后端 API 地址：同源访问时留空
   const API_URL = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
     ? ''
     : 'http://localhost:3000';
@@ -444,20 +659,24 @@
       .split(/[,，]/).map(s => s.trim()).filter(Boolean);
     const days = parseInt(document.getElementById('days').value);
     const budget = document.getElementById('budget').value;
-    const interests = [...document.querySelectorAll('#interests .chip.active')]
-      .map(c => c.dataset.value);
+    const interests = [...document.querySelectorAll('#interests .chip.active')].map(c => c.dataset.value);
     const travelStyle = document.getElementById('travelStyle').value;
     const language = document.getElementById('language').value;
     const currency = document.getElementById('currency').value;
     const dietary = document.getElementById('dietary').value.trim();
     const notes = document.getElementById('notes').value.trim();
     const email = document.getElementById('email').value.trim();
+    const travelers = document.getElementById('travelers').value;
+    const arrivalDate = document.getElementById('arrivalDate').value || '';
+    const hotelPref = document.getElementById('hotelPref').value;
+    const transportPref = document.getElementById('transportPref').value;
+    const firstCity = document.getElementById('firstCity').value.trim();
 
     if (cities.length === 0) { showError('请填写目标城市 / Please enter cities'); return; }
     if (interests.length === 0) { showError('请至少选择一个兴趣 / Please select at least 1 interest'); return; }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError('邮箱格式不正确 / Invalid email format'); return; }
 
-    const preferences = { cities, days, budget, interests, travelStyle, language, currency, dietary, notes, email };
+    const preferences = { cities, days, budget, interests, travelStyle, language, currency, dietary, notes, email, travelers, arrivalDate, hotelPref, transportPref, firstCity };
 
     const btn = document.getElementById('generateBtn');
     const status = document.getElementById('status');
@@ -471,9 +690,9 @@
     emailSuccess.classList.remove('show');
     emailWarn.classList.remove('show');
     if (email) {
-      statusText.innerHTML = `Reading knowledge base + AI writing... 生成完成后会自动发送到 <b>${email}</b>`;
+      statusText.innerHTML = `🧭 AI 正在生成（含高铁/地铁交通时间 + 穿衣清单 + 落地流程）... 生成完成后会自动发送到 <b>${email}</b>`;
     } else {
-      statusText.textContent = 'Reading knowledge base + AI writing (insider tips + restaurants + timeline)... please wait 60-90s (读取知识库 + AI 生成中，内容更丰富约需 60-90 秒...)';
+      statusText.textContent = '🧭 AI 正在生成（独家点位 + 餐厅推荐 + 精确交通时间 + 入境准备清单），内容较丰富，约 60-120 秒，请稍候...';
     }
 
     try {
@@ -482,18 +701,15 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ preferences, format: 'doc' })
       });
-
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Request failed 请求失败' }));
+        const err = await res.json().catch(() => ({ error: '请求失败 / Request failed' }));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-
       const data = await res.json();
       if (!data || !data.success) {
-        throw new Error((data && data.error) || '生成失败');
+        throw new Error((data && data.error) || '生成失败 / Failed to generate');
       }
-
-      // 下载 doc（base64 → blob）
+      // 下载 .doc
       const docBytes = Uint8Array.from(atob(data.docBase64), c => c.charCodeAt(0));
       const blob = new Blob([docBytes], { type: 'application/msword' });
       const url = URL.createObjectURL(blob);
@@ -505,17 +721,16 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      // 邮件发送结果提示
       if (data.warning) {
         emailWarn.textContent = `⚠️ ${data.warning}`;
         emailWarn.classList.add('show');
       }
       if (data.email) {
         if (data.email.ok) {
-          emailSuccess.textContent = `✅ 攻略已发送到 ${data.email.to}，附件中即为 .doc 文件（若未收到请检查垃圾邮件）`;
+          emailSuccess.textContent = `✅ 攻略已发送到 <b>${data.email.to}</b>，附件为 .doc 文件。若 3 分钟内没收到，请查「垃圾邮件」或 Gmail 的 Promotions / Updates 标签。`;
           emailSuccess.classList.add('show');
         } else {
-          emailWarn.textContent = `📧 邮件发送失败：${data.email.reason || '未知原因'}。但攻略已成功下载。`;
+          emailWarn.textContent = `📧 邮件发送失败：${data.email.reason || '未知原因'}。攻略已成功下载，不影响使用。`;
           emailWarn.classList.add('show');
         }
       }
@@ -527,7 +742,7 @@
     }
   });
 
-  function showError(msg) {
+  function showError(msg){
     const el = document.getElementById('error');
     el.textContent = msg;
     el.classList.add('show');

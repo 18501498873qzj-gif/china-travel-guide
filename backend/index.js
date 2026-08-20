@@ -20,7 +20,7 @@ if (process.env.NODE_ENV !== 'production') {
 const { fetchKnowledgeBase } = require('./feishu');
 const { generateGuide } = require('./deepseek');
 const { generateDoc } = require('./docgen');
-const { SYSTEM_PROMPT, buildUserPrompt } = require('./prompt');
+const { SYSTEM_PROMPT, buildUserPrompt, buildLocalizedFileInfo } = require('./prompt');
 const currency = require('./currency');
 
 // ---------- 邮件发送 ----------
@@ -57,34 +57,39 @@ async function sendGuideEmail(to, fileName, docBuffer, preferences) {
       return { ok: false, reason: 'SMTP 未配置（缺少 SMTP_USER / SMTP_PASS）' };
     }
     const cities = Array.isArray(preferences.cities) ? preferences.cities.join(' · ') : String(preferences.cities);
-    const langMap = { en: 'English', 'zh': '中文', ja: '日本語', ko: '한국어', fr: 'Français', de: 'Deutsch', es: 'Español', it: 'Italiano', pt: 'Português', ru: 'Русский', th: 'ไทย', vi: 'Tiếng Việt', id: 'Bahasa Indonesia', ms: 'Bahasa Melayu', fil: 'Filipino', hi: 'हिन्दी', ar: 'العربية', tr: 'Türkçe' };
-    const lang = (preferences.language && (preferences.language.code || String(preferences.language).slice(0, 2))) || 'en';
-    const langLabel = Object.entries(langMap).find(([k]) => String(lang).toLowerCase().startsWith(k.toLowerCase()))?.[1] || lang;
+    const { emailSubject: localizedSubject } = buildLocalizedFileInfo(preferences);
+    const defaultSubject = `Your ${preferences.days}-Day ${cities} China Travel Guide is ready 🧭`;
+    const subject = localizedSubject || defaultSubject;
+    const isZh = !!(preferences.language && String(preferences.language).includes('中文'));
     const mail = {
       from: `"China Travel Guide" <${cfg.from}>`,
       to,
-      subject: `您的${cities} ${preferences.days}天旅行攻略已生成 🧭`,
+      subject,
       html: `
         <div style="font-family:-apple-system,'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;background:#faf6f0;padding:24px;border-radius:12px;color:#2c3e50;">
           <div style="background:linear-gradient(135deg,#c0392b,#922b21);color:white;padding:20px 24px;border-radius:10px;text-align:center;">
-            <h2 style="margin:0;">🧭 您的旅行攻略已生成</h2>
+            <h2 style="margin:0;">${isZh ? '🧭 您的旅行攻略已生成' : '🧭 Your travel guide is ready'}</h2>
             <p style="margin:8px 0 0;opacity:0.92;font-size:14px;">祝您旅途愉快！Have a wonderful trip!</p>
           </div>
           <div style="padding:20px 24px;background:white;border-radius:10px;margin-top:16px;">
-            <h3 style="margin:0 0 12px;color:#c0392b;">📋 行程概览</h3>
+            <h3 style="margin:0 0 12px;color:#c0392b;">📋 ${isZh ? '行程概览' : 'Trip Overview'}</h3>
             <table style="width:100%;border-collapse:collapse;font-size:14px;">
-              <tr><td style="padding:6px 0;color:#7f8c8d;width:40%;">目的地</td><td style="padding:6px 0;"><b>${cities}</b></td></tr>
-              <tr><td style="padding:6px 0;color:#7f8c8d;">行程天数</td><td style="padding:6px 0;"><b>${preferences.days} 天</b></td></tr>
-              <tr><td style="padding:6px 0;color:#7f8c8d;">攻略语言</td><td style="padding:6px 0;">${langLabel}</td></tr>
-              <tr><td style="padding:6px 0;color:#7f8c8d;">预算等级</td><td style="padding:6px 0;">${preferences.budget || '-'}</td></tr>
-              ${preferences.interests?.length ? `<tr><td style="padding:6px 0;color:#7f8c8d;">兴趣方向</td><td style="padding:6px 0;">${preferences.interests.join('、')}</td></tr>` : ''}
+              <tr><td style="padding:6px 0;color:#7f8c8d;width:40%;">${isZh ? '目的地' : 'Destinations'}</td><td style="padding:6px 0;"><b>${cities}</b></td></tr>
+              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '行程天数' : 'Days'}</td><td style="padding:6px 0;"><b>${preferences.days} ${isZh ? '天' : 'days'}</b></td></tr>
+              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '人数' : 'Travelers'}</td><td style="padding:6px 0;">${preferences.travelers || '-'}</td></tr>
+              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '出发日期' : 'Arrival'}</td><td style="padding:6px 0;">${preferences.arrivalDate || '-'}</td></tr>
+              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '攻略语言' : 'Language'}</td><td style="padding:6px 0;">${preferences.language || '-'}</td></tr>
+              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '住宿偏好' : 'Hotel'}</td><td style="padding:6px 0;">${preferences.hotelPref || '-'}</td></tr>
+              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '交通偏好' : 'Transport'}</td><td style="padding:6px 0;">${preferences.transportPref || '-'}</td></tr>
+              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '预算等级' : 'Budget'}</td><td style="padding:6px 0;">${preferences.budget || '-'}</td></tr>
+              ${preferences.interests?.length ? `<tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '兴趣方向' : 'Interests'}</td><td style="padding:6px 0;">${Array.isArray(preferences.interests) ? preferences.interests.join('、') : preferences.interests}</td></tr>` : ''}
             </table>
             <p style="margin-top:20px;padding:12px 14px;background:#fff6e5;border-radius:8px;font-size:13px;color:#926b21;">
-              📎 攻略文档（.doc）在附件中，可直接用 Word / WPS / Google Docs 打开。
+              📎 ${isZh ? '攻略文档（.doc）在附件中，可直接用 Word / WPS / Google Docs 打开。' : 'Your guide (.doc) is attached — open with Word / WPS / Google Docs.'}
             </p>
           </div>
           <div style="text-align:center;font-size:12px;color:#7f8c8d;margin-top:16px;">
-            由 China Travel Guide Generator 自动发送 · Render 免费云部署
+            ${isZh ? '由 China Travel Guide Generator 自动发送 · Render 免费云部署' : 'Auto-sent by China Travel Guide Generator · Render free cloud deploy'}
           </div>
         </div>
       `,
@@ -203,10 +208,11 @@ exports.handler = async (event, context) => {
       const missingDays = expectedDays - dayMatches.length;
       const notice = `\n\n---\n⚠️ **生成提示**：本次因 AI 输出长度限制，实际生成 ${dayMatches.length} 天，缺少 ${missingDays} 天。建议重新生成，或减少天数/城市后重试。`;
       const patchedContent = markdownContent + notice;
-      // 继续走 .doc 生成流程
-      const docContent = generateDoc(patchedContent, `${preferences.cities.join('·')} 旅行攻略`);
+      // 继续走 .doc 生成流程（使用本地化文件名+文档标题）
+      const { fileName: localizedFile, docTitleInner: localizedTitle } = buildLocalizedFileInfo(preferences);
+      const docContent = generateDoc(patchedContent, localizedTitle);
       const docBuf = Buffer.isBuffer(docContent) ? docContent : Buffer.from(docContent, 'utf-8');
-      const fileName = `${preferences.cities.join('-')}-旅行攻略-不完整.doc`;
+      const fileName = localizedFile.replace(/\.doc$/, `-不完整${Date.now()}.doc`);
       let emailResult = null;
       if (userEmail) {
         emailResult = await sendGuideEmail(userEmail, fileName, docBuf, preferences);
@@ -235,10 +241,11 @@ exports.handler = async (event, context) => {
       return jsonRes(200, { success: true, format: 'markdown', content: markdownContent });
     }
 
-    // 默认生成 .doc
-    const docContent = generateDoc(markdownContent, `${preferences.cities.join('·')} 旅行攻略`);
+    // 默认生成 .doc（使用本地化文件名+文档标题）
+    const { fileName: localizedFile, docTitleInner: localizedTitle } = buildLocalizedFileInfo(preferences);
+    const docContent = generateDoc(markdownContent, localizedTitle);
     const docBuf = Buffer.isBuffer(docContent) ? docContent : Buffer.from(docContent, 'utf-8');
-    const fileName = `${preferences.cities.join('-')}-旅行攻略.doc`;
+    const fileName = localizedFile;
     let emailResult = null;
     if (userEmail) {
       emailResult = await sendGuideEmail(userEmail, fileName, docBuf, preferences);
