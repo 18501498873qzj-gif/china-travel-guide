@@ -298,6 +298,30 @@ if (require.main === module) {
 
       // GET 路由
     if (req.method === 'GET') {
+      // 定价页面
+      if (req.url === '/pricing' || req.url === '/pricing.html') {
+        try {
+          const html = fs.readFileSync(path.join(__dirname, 'pricing.html'), 'utf-8');
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(html);
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(`Pricing page load failed: ${err.message}`);
+        }
+        return;
+      }
+      // 退款政策页面
+      if (req.url === '/refund' || req.url === '/refund.html') {
+        try {
+          const html = fs.readFileSync(path.join(__dirname, 'refund.html'), 'utf-8');
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(html);
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(`Refund page load failed: ${err.message}`);
+        }
+        return;
+      }
       // 服务条款页面
       if (req.url === '/terms' || req.url === '/terms.html') {
         try {
