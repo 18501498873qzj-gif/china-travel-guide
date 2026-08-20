@@ -1,8 +1,10 @@
 // veFaaS Serverless 函数入口
-// 旅行攻略生成器：飞书知识库 + DeepSeek + .doc 输出
+// 旅行攻略生成器：飞书知识库 + DeepSeek + .doc 输出 + 邮件发送
 
 const fs = require('fs');
 const path = require('path');
+let nodemailer = null;
+try { nodemailer = require('nodemailer'); } catch (e) { /* nodemailer 可选，没装也不影响核心功能 */ }
 
 // 本地开发：加载 .env 文件（无需 dotenv 依赖）
 if (process.env.NODE_ENV !== 'production') {
@@ -20,6 +22,86 @@ const { generateGuide } = require('./deepseek');
 const { generateDoc } = require('./docgen');
 const { SYSTEM_PROMPT, buildUserPrompt } = require('./prompt');
 const currency = require('./currency');
+
+// ---------- 邮件发送 ----------
+function getSmtpConfig() {
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = Number(process.env.SMTP_PORT) || 587;
+  const secure = String(process.env.SMTP_SECURE || (port === 465 ? 'true' : 'false')) === 'true';
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  if (!user || !pass) return null;
+  return { host, port, secure, user, pass, from };
+}
+
+let _transporterCache = null;
+function getTransporter() {
+  if (_transporterCache) return _transporterCache;
+  const cfg = getSmtpConfig();
+  if (!cfg || !nodemailer) return null;
+  _transporterCache = nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
+    auth: { user: cfg.user, pass: cfg.pass }
+  });
+  return _transporterCache;
+}
+
+async function sendGuideEmail(to, fileName, docBuffer, preferences) {
+  try {
+    const transporter = getTransporter();
+    const cfg = getSmtpConfig();
+    if (!transporter || !cfg) {
+      return { ok: false, reason: 'SMTP 未配置（缺少 SMTP_USER / SMTP_PASS）' };
+    }
+    const cities = Array.isArray(preferences.cities) ? preferences.cities.join(' · ') : String(preferences.cities);
+    const langMap = { en: 'English', 'zh': '中文', ja: '日本語', ko: '한국어', fr: 'Français', de: 'Deutsch', es: 'Español', it: 'Italiano', pt: 'Português', ru: 'Русский', th: 'ไทย', vi: 'Tiếng Việt', id: 'Bahasa Indonesia', ms: 'Bahasa Melayu', fil: 'Filipino', hi: 'हिन्दी', ar: 'العربية', tr: 'Türkçe' };
+    const lang = (preferences.language && (preferences.language.code || String(preferences.language).slice(0, 2))) || 'en';
+    const langLabel = Object.entries(langMap).find(([k]) => String(lang).toLowerCase().startsWith(k.toLowerCase()))?.[1] || lang;
+    const mail = {
+      from: `"China Travel Guide" <${cfg.from}>`,
+      to,
+      subject: `您的${cities} ${preferences.days}天旅行攻略已生成 🧭`,
+      html: `
+        <div style="font-family:-apple-system,'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;background:#faf6f0;padding:24px;border-radius:12px;color:#2c3e50;">
+          <div style="background:linear-gradient(135deg,#c0392b,#922b21);color:white;padding:20px 24px;border-radius:10px;text-align:center;">
+            <h2 style="margin:0;">🧭 您的旅行攻略已生成</h2>
+            <p style="margin:8px 0 0;opacity:0.92;font-size:14px;">祝您旅途愉快！Have a wonderful trip!</p>
+          </div>
+          <div style="padding:20px 24px;background:white;border-radius:10px;margin-top:16px;">
+            <h3 style="margin:0 0 12px;color:#c0392b;">📋 行程概览</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+              <tr><td style="padding:6px 0;color:#7f8c8d;width:40%;">目的地</td><td style="padding:6px 0;"><b>${cities}</b></td></tr>
+              <tr><td style="padding:6px 0;color:#7f8c8d;">行程天数</td><td style="padding:6px 0;"><b>${preferences.days} 天</b></td></tr>
+              <tr><td style="padding:6px 0;color:#7f8c8d;">攻略语言</td><td style="padding:6px 0;">${langLabel}</td></tr>
+              <tr><td style="padding:6px 0;color:#7f8c8d;">预算等级</td><td style="padding:6px 0;">${preferences.budget || '-'}</td></tr>
+              ${preferences.interests?.length ? `<tr><td style="padding:6px 0;color:#7f8c8d;">兴趣方向</td><td style="padding:6px 0;">${preferences.interests.join('、')}</td></tr>` : ''}
+            </table>
+            <p style="margin-top:20px;padding:12px 14px;background:#fff6e5;border-radius:8px;font-size:13px;color:#926b21;">
+              📎 攻略文档（.doc）在附件中，可直接用 Word / WPS / Google Docs 打开。
+            </p>
+          </div>
+          <div style="text-align:center;font-size:12px;color:#7f8c8d;margin-top:16px;">
+            由 China Travel Guide Generator 自动发送 · Render 免费云部署
+          </div>
+        </div>
+      `,
+      attachments: [{
+        filename: fileName,
+        content: docBuffer,
+        contentType: 'application/msword'
+      }]
+    };
+    const info = await transporter.sendMail(mail);
+    console.log(`[EMAIL] 发送成功: ${to} -> ${info.messageId || 'ok'}`);
+    return { ok: true, info: info.messageId };
+  } catch (err) {
+    console.error(`[EMAIL] 发送失败 (${to}):`, err.message);
+    return { ok: false, reason: err.message };
+  }
+}
 
 // 预算等级 → 每日人民币中位数（与前端保持一致）
 const BUDGET_CNY_PER_DAY = {
@@ -68,6 +150,10 @@ exports.handler = async (event, context) => {
 
     if (!preferences || !preferences.cities || !preferences.days) {
       return jsonRes(400, { error: '缺少必要参数：cities, days' });
+    }
+    const userEmail = preferences.email ? String(preferences.email).trim() : null;
+    if (userEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
+      return jsonRes(400, { error: '邮箱格式不正确' });
     }
 
     // 1. 读取飞书知识库（从环境变量获取配置）
@@ -119,15 +205,28 @@ exports.handler = async (event, context) => {
       const patchedContent = markdownContent + notice;
       // 继续走 .doc 生成流程
       const docContent = generateDoc(patchedContent, `${preferences.cities.join('·')} 旅行攻略`);
+      const docBuf = Buffer.isBuffer(docContent) ? docContent : Buffer.from(docContent, 'utf-8');
       const fileName = `${preferences.cities.join('-')}-旅行攻略-不完整.doc`;
+      let emailResult = null;
+      if (userEmail) {
+        emailResult = await sendGuideEmail(userEmail, fileName, docBuf, preferences);
+      }
       return {
         statusCode: 200,
         headers: {
-          'Content-Type': 'application/msword; charset=utf-8',
-          'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
+          'Content-Type': 'application/json; charset=utf-8',
           ...CORS_HEADERS
         },
-        body: docContent
+        body: JSON.stringify({
+          success: true,
+          format: 'doc',
+          fileName,
+          docBase64: docBuf.toString('base64'),
+          daysGenerated: dayMatches.length,
+          daysExpected: expectedDays,
+          warning: `天数不足：实际 ${dayMatches.length} / 期望 ${expectedDays}，建议重新生成`,
+          email: userEmail ? { to: userEmail, ...emailResult } : null
+        })
       };
     }
 
@@ -138,16 +237,28 @@ exports.handler = async (event, context) => {
 
     // 默认生成 .doc
     const docContent = generateDoc(markdownContent, `${preferences.cities.join('·')} 旅行攻略`);
+    const docBuf = Buffer.isBuffer(docContent) ? docContent : Buffer.from(docContent, 'utf-8');
     const fileName = `${preferences.cities.join('-')}-旅行攻略.doc`;
+    let emailResult = null;
+    if (userEmail) {
+      emailResult = await sendGuideEmail(userEmail, fileName, docBuf, preferences);
+    }
 
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': 'application/msword; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
+        'Content-Type': 'application/json; charset=utf-8',
         ...CORS_HEADERS
       },
-      body: docContent
+      body: JSON.stringify({
+        success: true,
+        format: 'doc',
+        fileName,
+        docBase64: docBuf.toString('base64'),
+        daysGenerated: dayMatches.length,
+        daysExpected: expectedDays,
+        email: userEmail ? { to: userEmail, ...emailResult } : null
+      })
     };
 
   } catch (err) {
