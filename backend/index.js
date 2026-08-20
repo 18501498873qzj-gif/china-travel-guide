@@ -178,17 +178,44 @@ if (require.main === module) {
       res.writeHead(204); res.end(); return;
     }
 
-    // GET / 或 /index.html → 返回前端页面
-    if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
-      try {
-        const html = fs.readFileSync(FRONTEND_PATH, 'utf-8');
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(html);
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end(`前端页面读取失败: ${err.message}`);
+      // GET 路由
+    if (req.method === 'GET') {
+      // 服务条款页面
+      if (req.url === '/terms' || req.url === '/terms.html') {
+        try {
+          const html = fs.readFileSync(path.join(__dirname, 'terms.html'), 'utf-8');
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(html);
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(`Terms page load failed: ${err.message}`);
+        }
+        return;
       }
-      return;
+      // 隐私政策页面
+      if (req.url === '/privacy' || req.url === '/privacy.html') {
+        try {
+          const html = fs.readFileSync(path.join(__dirname, 'privacy.html'), 'utf-8');
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(html);
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(`Privacy page load failed: ${err.message}`);
+        }
+        return;
+      }
+      // 首页
+      if (req.url === '/' || req.url === '/index.html') {
+        try {
+          const html = fs.readFileSync(FRONTEND_PATH, 'utf-8');
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(html);
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(`前端页面读取失败: ${err.message}`);
+        }
+        return;
+      }
     }
 
     // POST / → 生成攻略
