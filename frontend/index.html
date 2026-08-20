@@ -172,6 +172,25 @@
   }
   label .hint{font-weight:400;color:var(--ink-muted);font-size:12px;margin-left:6px;}
   label .zh{font-weight:400;color:var(--ink-muted);font-size:12px;margin-left:4px;}
+  .field-notice{
+    margin-top:9px;
+    font-size:12px;
+    line-height:1.7;
+    color:var(--ink-muted);
+    background:#fff8ea;
+    border:1px dashed #e5d6b6;
+    padding:9px 12px;
+    border-radius:var(--radius-md);
+  }
+  .field-notice a{
+    color:var(--red);
+    text-decoration:none;
+    border-bottom:1px dashed var(--red);
+  }
+  .field-notice b{
+    color:#8a5a12;
+    font-weight:600;
+  }
   input[type="text"], input[type="email"], input[type="number"], input[type="date"], select, textarea{
     width:100%;
     padding:11px 14px;
@@ -337,6 +356,29 @@
     display:block; margin:0 auto 14px;
     width:40px; height:1px;
     background:var(--divider);
+  }
+  footer .footer-links{
+    margin-bottom:10px;
+    line-height:1.9;
+  }
+  footer .footer-links a{
+    color:var(--ink);
+    text-decoration:none;
+    border-bottom:1px dashed var(--ink-muted);
+    transition:color .2s,border-color .2s;
+  }
+  footer .footer-links a:hover{
+    color:var(--red);
+    border-bottom-color:var(--red);
+  }
+  footer .footer-links .sep{
+    display:inline-block;
+    margin:0 10px;
+    color:var(--ink-muted);
+    opacity:.5;
+  }
+  footer .footer-line{
+    opacity:.82;
   }
 
   /* ---------- RESPONSIVE ---------- */
@@ -568,6 +610,9 @@
       <div class="form-group">
         <label>Your Email · 发送到此邮箱<span class="hint">选填 · 留空仅下载；填了就下载 + 同时发邮件</span></label>
         <input type="email" id="email" placeholder="your@email.com — 攻略.doc 会作为附件发送到此邮箱">
+        <p class="field-notice">
+          🔒 提供邮箱即视为同意我们按 <a href="/privacy" target="_blank" rel="noopener">隐私政策</a> 当次一次性投递 .doc 攻略附件。<b>不加入任何邮件列表 · 不发营销邮件 · 发完不留存邮箱</b>。/ By entering your email, you agree our <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>. We send your guide exactly once — no mailing list, no marketing, no retention.
+        </p>
       </div>
 
       <button class="btn" id="generateBtn">✨ 生成攻略 · Generate Travel Guide & Download / Email</button>
@@ -585,7 +630,14 @@
 
   <footer>
     <span class="divider"></span>
-    Feishu Base · DeepSeek AI · Gmail SMTP · Render 部署 · Made with 🐼 ❤️
+    <div class="footer-links">
+      <a href="/terms" target="_blank" rel="noopener">服务条款 · Terms of Service</a>
+      <span class="sep">|</span>
+      <a href="/privacy" target="_blank" rel="noopener">隐私政策 · Privacy Policy</a>
+    </div>
+    <div class="footer-line">
+      Feishu Base · DeepSeek AI · Gmail SMTP · Render 部署 · Made with 🐼 ❤️
+    </div>
   </footer>
 
 <script>

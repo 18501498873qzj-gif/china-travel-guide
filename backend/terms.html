@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>服务条款 · Terms of Service · China Travel Guide Generator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Serif SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #faf6f0;
+    color: #2c3e50;
+    line-height: 1.85;
+    padding: 40px 24px 80px;
+  }
+  .container { max-width: 760px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 40px 40px 48px; box-shadow: 0 2px 14px rgba(0,0,0,0.07); border-top: 4px solid #c0392b; }
+  h1 { font-size: 26px; color: #c0392b; margin-bottom: 4px; letter-spacing: .3px; }
+  .sub-zh { font-size: 20px; color: #922b21; margin-bottom: 4px; font-weight: 600; }
+  .updated { color: #7f8c8d; font-size: 13px; margin-bottom: 28px; padding-top: 4px; border-top: 1px dashed #e7ded1; margin-top: 14px; padding-top: 14px; }
+  h2 { font-size: 18px; color: #922b21; margin-top: 26px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #f3ead9; }
+  h2 .zh { font-size: 16px; color: #8a5a12; display: block; margin-top: 2px; font-weight: 500; letter-spacing: .3px; }
+  p { margin-bottom: 12px; font-size: 14.5px; }
+  ul { margin: 8px 0 16px 24px; }
+  li { margin-bottom: 6px; font-size: 14.5px; }
+  a { color: #c0392b; text-decoration: none; border-bottom: 1px dashed #c0392b; }
+  a:hover { border-bottom-style: solid; }
+  .back { display: inline-block; margin-top: 32px; color: #7f8c8d; font-size: 14px; text-decoration: none; border: 1px solid #d8cdbf; padding: 9px 18px; border-radius: 22px; transition: all .2s; }
+  .back:hover { color: #fff; background: #c0392b; border-color: #c0392b; }
+  .contact { background: #fff7e6; padding: 14px 18px; border-radius: 8px; border-left: 3px solid #e2a939; }
+  .highlight { background: #fdf2e9; padding: 12px 16px; border-radius: 8px; border-left: 3px solid #c0392b; margin: 14px 0 18px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Terms of Service</h1>
+  <div class="sub-zh">服务条款</div>
+  <p class="updated">Last updated / 最后更新：August 20, 2026 · 2026 年 8 月 20 日</p>
+
+  <h2>1. Acceptance of Terms<span class="zh">一、条款接受</span></h2>
+  <p>By accessing and using the China Travel Guide Generator service ("the Service"), you agree to be bound by these Terms of Service. If you do not agree with any part of these terms, you may not use the Service.</p>
+  <p>访问和使用「中国旅行攻略生成器」服务（以下简称「本服务」）即表示您同意受本服务条款约束。若您不同意其中任何条款，请勿使用本服务。</p>
+
+  <h2>2. Service Description<span class="zh">二、服务说明</span></h2>
+  <p>We provide an AI-powered travel guide generation service that creates personalized China travel itineraries based on user preferences. The Service uses a combination of knowledge base data (hosted on Feishu Base) and AI generation (DeepSeek API) to produce travel guides in .doc format. Optionally, if the user provides an email address, the generated .doc file will be delivered as an email attachment via Gmail SMTP (Nodemailer).</p>
+  <p>本服务根据用户提供的旅行偏好，结合飞书多维表格知识库与 DeepSeek AI 大模型，为用户生成个性化的中国旅行攻略 .doc 文档。如用户自愿填写邮箱地址，本服务会通过 Gmail SMTP（Nodemailer）将生成的 .doc 攻略作为附件一次性发送到该邮箱。</p>
+
+  <h2>3. User Responsibilities<span class="zh">三、用户义务</span></h2>
+  <ul>
+    <li>You must provide accurate and truthful information when using the Service, including a valid email address if you opt in to receive the guide by email. / 使用本服务时须提供真实准确的信息，包括如需收取攻略邮件，请填写有效的邮箱地址。</li>
+    <li>You are responsible for any content you generate using the Service. / 您须对通过本服务生成的任何内容自行承担责任。</li>
+    <li>You agree not to use the Service for any illegal or unauthorized purpose. / 您同意不得将本服务用于任何非法或未经授权的用途。</li>
+    <li>You must not attempt to reverse engineer, modify, scrape, abuse rate limits, or disrupt the Service. / 不得对本服务进行逆向工程、修改、爬取、滥用接口频率或干扰服务运行。</li>
+    <li>Email addresses provided are for the sole purpose of delivering the generated guide in that session and must not be used to impersonate others. / 填写邮箱仅用于当次生成攻略的投递，不得冒用他人邮箱。</li>
+  </ul>
+
+  <h2>4. Email Delivery (Optional Feature)<span class="zh">四、邮件投递功能（可选）</span></h2>
+  <div class="highlight">
+    <p><strong>English</strong>：Providing an email address is <u>completely optional</u>. If you enter an email, we will use Gmail SMTP through Nodemailer to send the generated .doc guide <strong>once, as an attachment</strong>, for that specific request only. We do not add emails to any mailing list, do not send marketing messages, and do not share email addresses with third parties. Delivery is handled by Google/Gmail and is subject to Google's Terms of Service and Privacy Policy. If you do not receive the email within 5 minutes, please check Spam / Promotions / Updates folders, or simply download the guide directly from the browser (the download always happens automatically regardless of email).</p>
+    <p style="margin-top:10px;"><strong>中文</strong>：提供邮箱地址是<strong><u>完全可选</u></strong>的。如填写邮箱，我们仅当次通过 Nodemailer + Gmail SMTP <strong>一次性</strong>把生成的 .doc 攻略作为附件投递到此邮箱。<u>不会将邮箱加入任何邮件列表、不会发送营销内容、不会将邮箱提供给任何第三方</u>。邮件投递由 Google/Gmail 服务器处理，适用 Google 服务条款与隐私政策。若 5 分钟内未收到邮件，请查「垃圾邮件 / 推广 / 更新」标签；或者直接从浏览器下载（无论发邮件与否，浏览器端都会自动下载攻略）。</p>
+  </div>
+
+  <h2>5. Intellectual Property<span class="zh">五、知识产权</span></h2>
+  <p>The travel guides generated by the Service are provided for personal, non-commercial use only. The underlying software, design, trademarks, and technology of the Service are proprietary and protected by applicable intellectual property laws of the People's Republic of China and international treaties.</p>
+  <p>本服务生成的旅行攻略仅供个人非商业用途使用。本服务所包含的底层软件、界面设计、视觉元素与技术受中华人民共和国知识产权法及相关国际条约保护。</p>
+
+  <h2>6. Disclaimer<span class="zh">六、免责声明</span></h2>
+  <p>The travel guides are generated by AI and may contain inaccuracies, including but not limited to outdated opening hours, incorrect pricing, discontinued transportation routes, or travel restrictions that have changed after the guide was generated. We strongly recommend verifying all information independently before making travel arrangements. We are not liable for any losses, injuries, or damages arising from the use of the generated content.</p>
+  <p>攻略由 AI 模型生成，可能存在信息不准确或未及时更新的情况（包括但不限于景点开闭馆时间、门票价格、交通班次、入境/签证政策）。出行前请务必自行再次核实所有信息。对于因使用本服务生成内容导致的任何损失、人身伤害或费用增加，本服务不承担任何法律责任。</p>
+
+  <h2>7. Limitation of Liability<span class="zh">七、责任限制</span></h2>
+  <p>We shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the Service. Our total liability, to the maximum extent permitted by law, shall not exceed the amount paid by you for the Service (which is zero as the Service is currently provided free of charge).</p>
+  <p>在法律允许的最大范围内，本服务不对因使用或无法使用本服务导致的任何间接、附带、特殊、后果性或惩罚性损害承担责任。因本服务当前为免费提供，我方全部责任上限不超过您为使用本服务实际支付的金额（即 0 元）。</p>
+
+  <h2>8. Privacy<span class="zh">八、隐私权</span></h2>
+  <p>Your use of the Service is also governed by our <a href="/privacy">Privacy Policy / 隐私政策</a>, which specifically covers how we handle travel preferences and any email address you provide.</p>
+  <p>您使用本服务同时受我们的 <a href="/privacy">隐私政策</a> 约束，其中对旅行偏好信息与邮箱地址的处理方式有专门说明。</p>
+
+  <h2>9. Changes to Terms<span class="zh">九、条款修改</span></h2>
+  <p>We reserve the right to modify these terms at any time. Changes will be effective immediately upon posting to this page. Continued use of the Service after any changes constitutes acceptance of the new terms.</p>
+  <p>本条款可能随时更新，更新内容一经在本页面发布即生效。继续使用本服务即视为接受更新后的条款。</p>
+
+  <h2>10. Governing Law<span class="zh">十、适用法律</span></h2>
+  <p>These terms shall be governed by the laws of the People's Republic of China, without regard to conflict of law principles. Any dispute shall be submitted to the competent courts of the People's Republic of China.</p>
+  <p>本条款的订立、执行、解释及争议解决均适用中华人民共和国法律（不含冲突法），相关争议由中华人民共和国有管辖权的人民法院管辖。</p>
+
+  <h2>11. Contact<span class="zh">十一、联系方式</span></h2>
+  <div class="contact">
+    <p>For questions about these terms, email delivery issues, or takedown requests, please contact us at：</p>
+    <p>如对本条款有任何疑问、邮件投递异常、或需要发起权利通知，请联系：</p>
+    <p style="margin-top:8px;"><a href="mailto:18501498873qzj@gmail.com">📧 18501498873qzj@gmail.com</a></p>
+  </div>
+
+  <a href="/" class="back">← 返回首页 / Back to Home</a>
+</div>
+</body>
+</html>
