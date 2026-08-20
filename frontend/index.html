@@ -191,6 +191,91 @@
     color:#8a5a12;
     font-weight:600;
   }
+
+  /* ---------- AGREE CHECKBOX ---------- */
+  .agree-wrapper{
+    margin:-4px 0 22px;
+    background:#fcf5e6;
+    border:1.5px solid #eddcb7;
+    border-radius:var(--radius-md);
+    padding:14px 16px;
+    transition:border-color .2s, background .2s;
+  }
+  .agree-wrapper.has-error{
+    border-color:#c0392b;
+    background:#fff1ef;
+    box-shadow:0 0 0 3px rgba(192,57,43,.08);
+    animation:shake .36s ease;
+  }
+  @keyframes shake{
+    0%,100%{transform:translateX(0);}
+    25%{transform:translateX(-5px);}
+    75%{transform:translateX(5px);}
+  }
+  label.agree{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    cursor:pointer;
+    user-select:none;
+    margin:0;
+    font-weight:500;
+    color:var(--ink-soft);
+    font-size:13.5px;
+    line-height:1.65;
+  }
+  label.agree input[type="checkbox"]{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+    width:0; height:0;
+  }
+  .agree-box{
+    flex-shrink:0;
+    margin-top:2px;
+    width:20px; height:20px;
+    border-radius:5px;
+    border:2px solid #c9b38a;
+    background:#fffdf5;
+    position:relative;
+    transition:all .18s ease;
+  }
+  label.agree input:checked + .agree-box{
+    background:var(--cinnabar,#c0392b);
+    border-color:var(--cinnabar,#c0392b);
+  }
+  label.agree input:checked + .agree-box::after{
+    content:"";
+    position:absolute;
+    left:5.5px; top:1.5px;
+    width:5.5px; height:10.5px;
+    border:solid white;
+    border-width:0 2.2px 2.2px 0;
+    transform:rotate(45deg);
+  }
+  label.agree input:focus-visible + .agree-box{
+    box-shadow:0 0 0 3px rgba(192,57,43,.14);
+  }
+  .agree-text a{
+    color:var(--red,#c0392b);
+    text-decoration:none;
+    border-bottom:1px dashed var(--red,#c0392b);
+    font-weight:600;
+  }
+  .agree-text small{
+    display:block;
+    margin-top:4px;
+    color:var(--ink-muted);
+    font-size:12px;
+    line-height:1.55;
+  }
+  .agree-tip{
+    color:#c0392b;
+    font-size:12px;
+    margin-top:6px;
+    padding-left:32px;
+    font-weight:600;
+  }
   input[type="text"], input[type="email"], input[type="number"], input[type="date"], select, textarea{
     width:100%;
     padding:11px 14px;
@@ -615,6 +700,17 @@
         </p>
       </div>
 
+      <div class="agree-wrapper">
+        <label class="agree">
+          <input type="checkbox" id="agree">
+          <span class="agree-box"></span>
+          <span class="agree-text">
+            我已阅读并同意 <a href="/terms" target="_blank" rel="noopener">《服务条款 · Terms of Service》</a> 与 <a href="/privacy" target="_blank" rel="noopener">《隐私政策 · Privacy Policy》</a>（含邮箱采集与跨境数据传输声明）<br>
+            <small>I have read and agree to the Terms of Service and Privacy Policy (incl. email collection & cross-border transfer notice)</small>
+          </span>
+        </label>
+      </div>
+
       <button class="btn" id="generateBtn">✨ 生成攻略 · Generate Travel Guide & Download / Email</button>
 
       <div class="status" id="status">
@@ -727,6 +823,36 @@
     if (cities.length === 0) { showError('请填写目标城市 / Please enter cities'); return; }
     if (interests.length === 0) { showError('请至少选择一个兴趣 / Please select at least 1 interest'); return; }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError('邮箱格式不正确 / Invalid email format'); return; }
+    // 合规：必须手动勾选同意条款&隐私（默认未勾选，不能默认就同意）
+    const agreeWrap = document.querySelector('.agree-wrapper');
+    const agreeEl = document.getElementById('agree');
+    // 先清理上一次错误
+    agreeWrap.classList.remove('has-error');
+    // 如果已经插入过提示 span，这次先移除避免重复
+    const oldTip = agreeWrap.querySelector('.agree-tip');
+    if (oldTip) oldTip.remove();
+    if (!agreeEl.checked) {
+      agreeWrap.classList.add('has-error');
+      const tip = document.createElement('div');
+      tip.className = 'agree-tip';
+      tip.textContent = '⚠️ 请先手动勾选同意服务条款与隐私政策 / Please manually check to agree the Terms & Privacy';
+      agreeWrap.appendChild(tip);
+      agreeWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 3.5 秒后自动清除错误高亮
+      setTimeout(() => { agreeWrap.classList.remove('has-error'); const t = agreeWrap.querySelector('.agree-tip'); if (t) t.remove(); }, 3500);
+      return;
+    }
+    // 勾选状态变更后，清除错误提示（单次监听后移除）
+    if (!agreeEl._agreeBoundOnce) {
+      agreeEl.addEventListener('change', () => {
+        if (agreeEl.checked) {
+          agreeWrap.classList.remove('has-error');
+          const t = agreeWrap.querySelector('.agree-tip');
+          if (t) t.remove();
+        }
+      });
+      agreeEl._agreeBoundOnce = true;
+    }
 
     const preferences = { cities, days, budget, interests, travelStyle, language, currency, dietary, notes, email, travelers, arrivalDate, hotelPref, transportPref, firstCity };
 
