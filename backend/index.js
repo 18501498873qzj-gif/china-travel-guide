@@ -85,7 +85,7 @@ async function sendGuideEmail(to, fileName, docBuffer, preferences) {
   const subject = localizedSubject || defaultSubject;
   const isZh = !!(preferences.language && String(preferences.language).includes('中文'));
   const cfg = getSmtpConfig();
-  const fromEmail = process.env.RESEND_FROM || (cfg ? cfg.from : process.env.SMTP_FROM || 'onboarding@resend.dev');
+  const fromEmail = process.env.RESEND_FROM || (cfg ? cfg.from : process.env.SMTP_FROM || '"China Travel Guide" <18501498873qzj@gmail.com>');
 
   const emailHtml = `
     <div style="font-family:-apple-system,'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;background:#faf6f0;padding:24px;border-radius:12px;color:#2c3e50;">
