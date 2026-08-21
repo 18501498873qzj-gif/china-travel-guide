@@ -1,6 +1,9 @@
 // .doc 文档生成模块
 // 将 Markdown 攻略内容转换为 Word 可打开的 .doc 文件
 // 采用 HTML 包装 + Word XML 头的方式，生成 Word 能直接打开的 .doc（无需第三方二进制依赖）
+// 注意：必须加 UTF-8 BOM (EF BB BF)，否则 Word 会用系统默认编码（GBK）导致中文乱码
+
+const UTF8_BOM = '\uFEFF';
 
 // 将 Markdown 转为简单 HTML（支持标题、加粗、列表、段落）
 function markdownToHtml(md) {
@@ -45,15 +48,16 @@ function markdownToHtml(md) {
   return html.join('\n');
 }
 
-// 生成 .doc 文件内容（Word 可打开的 HTML 格式，带 Word XML 命名空间）
+// 生成 .doc 文件内容（Word 可打开的 HTML 格式，带 Word XML 命名空间 + UTF-8 BOM）
 function generateDoc(markdownContent, title = '中国旅行攻略') {
   const bodyHtml = markdownToHtml(markdownContent);
-  const doc = `<!DOCTYPE html>
+  const doc = `${UTF8_BOM}<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office"
       xmlns:w="urn:schemas-microsoft-com:office:word"
       xmlns="http://www.w3.org/TR/REC-html40">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <title>${title}</title>
 <!--[if gte mso 9]>
 <xml>
