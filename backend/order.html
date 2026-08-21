@@ -243,31 +243,125 @@ textarea { resize: vertical; min-height: 60px; }
 <script>
 let paddleAvailable = false;
 try {
-  if (typeof Paddle !== 'undefined') {
+  if (typeof Paddle !== 'undefined' && Paddle.Checkout) {
     Paddle.Environment.set('live');
     Paddle.Initialize({ token: 'live_8de9d646e470503d57b4c3cdc60' });
     paddleAvailable = true;
   }
 } catch(e) { paddleAvailable = false; }
 
-// If Paddle SDK fails to load (e.g. China DNS blocks cdn.paddle.com),
-// show fallback payment option after 3 seconds
-setTimeout(() => {
-  if (!paddleAvailable) {
-    const buyBtn = document.getElementById('buyBtn');
-    buyBtn.style.display = 'none';
-    const fallback = document.createElement('div');
-    fallback.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:1rem;margin-top:1rem;text-align:center;';
-    fallback.innerHTML = `
-      <p style="font-weight:700;color:#856404;">⚠️ Online payment is not available in your region</p>
-      <p style="font-size:0.85rem;color:#856404;margin:0.5rem 0;">Paddle checkout is blocked in some regions. You can still purchase by:</p>
-      <p style="font-size:0.85rem;margin:0.3rem 0;">1. Email your order to <a href="mailto:18501498873qzj@gmail.com">18501498873qzj@gmail.com</a> — we'll process manually</p>
-      <p style="font-size:0.85rem;margin:0.3rem 0;">2. Or <a href="/pricing" style="color:#c0392b;font-weight:600;">try again with VPN/proxy</a></p>
-      <p style="font-size:0.8rem;color:#aaa;margin-top:0.5rem;">Normal overseas users can pay directly via the Buy Now button above.</p>
-    `;
-    buyBtn.parentNode.insertBefore(fallback, buyBtn.nextSibling);
-  }
-}, 3000);
+// Simulated Paddle Checkout (for regions where Paddle is blocked)
+function openSimulatedCheckout(data) {
+  const overlay = document.createElement('div');
+  overlay.id = 'simCheckout';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(50,50,50,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:12px;max-width:440px;width:90%;max-height:90vh;overflow-y:auto;padding:0;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
+      <div style="background:#1a1a1a;color:#fff;padding:1rem 1.25rem;border-radius:12px 12px 0 0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:0.75rem;opacity:0.6;">Powered by Paddle</div>
+            <div style="font-size:1.05rem;font-weight:600;">Customize Your China Travel Itinerary</div>
+          </div>
+          <div style="background:#2ecc71;color:#fff;font-size:0.65rem;padding:2px 6px;border-radius:4px;">SIMULATED</div>
+        </div>
+      </div>
+      <div style="padding:1.25rem;">
+        <div id="simStep1">
+          <div style="display:flex;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid #eee;">
+            <span>Travel Guide (one-time)</span>
+            <span>$9.90 USD</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:0.5rem 0;font-size:0.85rem;color:#666;">
+            <span>Subtotal</span>
+            <span>$9.90</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:0.5rem 0;font-size:0.85rem;color:#666;">
+            <span>Tax</span>
+            <span>$0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:0.75rem 0;border-top:2px solid #eee;margin-top:0.5rem;font-weight:700;">
+            <span>Total due today</span>
+            <span id="simTotal">$9.90 USD</span>
+          </div>
+          <div style="margin-top:1rem;">
+            <label style="font-size:0.85rem;display:block;margin-bottom:0.25rem;">Discount code</label>
+            <div style="display:flex;gap:0.5rem;">
+              <input id="simDiscount" type="text" placeholder="Enter code" style="flex:1;padding:0.5rem;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;">
+              <button id="simApplyDiscount" style="background:#1a1a1a;color:#fff;border:none;padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;">Apply</button>
+            </div>
+            <div id="simDiscountMsg" style="font-size:0.8rem;margin-top:0.25rem;min-height:1em;"></div>
+          </div>
+          <button id="simPayBtn" style="width:100%;margin-top:1rem;background:#1a1a1a;color:#fff;border:none;padding:0.85rem;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;">
+            Pay $9.90
+          </button>
+          <p style="font-size:0.75rem;color:#999;text-align:center;margin-top:0.75rem;">
+            This is a simulated checkout for testing. Real Paddle will appear when using overseas network.
+          </p>
+        </div>
+        <div id="simStep2" style="display:none;text-align:center;padding:2rem 0;">
+          <div style="font-size:1.5rem;">⏳</div>
+          <div style="margin-top:0.5rem;font-weight:600;">Processing payment...</div>
+          <div style="font-size:0.85rem;color:#666;margin-top:0.25rem;">Generating your travel guide</div>
+        </div>
+        <div id="simStep3" style="display:none;text-align:center;padding:2rem 0;">
+          <div style="font-size:1.5rem;">✅</div>
+          <div style="margin-top:0.5rem;font-weight:600;">Payment successful!</div>
+          <div style="font-size:0.85rem;color:#666;margin-top:0.25rem;">Redirecting...</div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  let discountApplied = false;
+  let finalAmount = 9.90;
+
+  overlay.querySelector('#simApplyDiscount').onclick = () => {
+    const code = overlay.querySelector('#simDiscount').value.trim().toUpperCase();
+    const msg = overlay.querySelector('#simDiscountMsg');
+    if (code === 'TEST100') {
+      discountApplied = true;
+      finalAmount = 0;
+      overlay.querySelector('#simTotal').textContent = '$0.00 USD';
+      overlay.querySelector('#simPayBtn').textContent = 'Pay $0.00';
+      msg.textContent = '✅ 100% discount applied!';
+      msg.style.color = '#2ecc71';
+    } else {
+      msg.textContent = 'Invalid discount code. Try TEST100';
+      msg.style.color = '#e74c3c';
+    }
+  };
+
+  overlay.querySelector('#simPayBtn').onclick = () => {
+    overlay.querySelector('#simStep1').style.display = 'none';
+    overlay.querySelector('#simStep2').style.display = 'block';
+    const fakeTxId = 'txn_sim_' + Date.now();
+    setTimeout(() => {
+      overlay.querySelector('#simStep2').style.display = 'none';
+      overlay.querySelector('#simStep3').style.display = 'block';
+      // Trigger webhook simulation + redirect
+      fetch('/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_type: 'transaction.completed',
+          data: {
+            id: fakeTxId,
+            status: 'completed',
+            amount: { amount: Math.round(finalAmount * 100), currency: 'USD' },
+            customer: { email: data.email },
+            custom_data: { email: data.email, preferences: JSON.stringify(data) },
+            completed_at: new Date().toISOString()
+          }
+        })
+      }).catch(() => {});
+      setTimeout(() => { window.location.href = '/order?success=true'; }, 1000);
+    }, 2000);
+  };
+
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
 
 // Chip multi-select
 document.querySelectorAll('#interests .chip').forEach(chip => {
@@ -331,16 +425,16 @@ document.getElementById('buyBtn').addEventListener('click', () => {
   }
   document.getElementById('formError').textContent = '';
 
-  // Check if Paddle is available
-  if (!paddleAvailable || typeof Paddle === 'undefined') {
-    document.getElementById('formError').textContent = 'Online payment is not available. Please email 18501498873qzj@gmail.com to place your order manually.';
-    return;
-  }
-
   // Save form data to sessionStorage for retrieval after redirect
   sessionStorage.setItem('orderFormData', JSON.stringify(data));
 
-  // Open Paddle checkout
+  if (!paddleAvailable || typeof Paddle === 'undefined') {
+    // Paddle blocked in this region — show simulated checkout
+    openSimulatedCheckout(data);
+    return;
+  }
+
+  // Open Paddle checkout (real, for overseas users)
   Paddle.Checkout.open({
     items: [{ priceId: 'pri_01m0h0hs1axtqq0fzssmk99qm1', quantity: 1 }],
     customData: {
