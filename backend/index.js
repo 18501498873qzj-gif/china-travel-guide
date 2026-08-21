@@ -45,7 +45,12 @@ function getTransporter() {
     host: cfg.host,
     port: cfg.port,
     secure: cfg.secure,
-    auth: { user: cfg.user, pass: cfg.pass }
+    auth: { user: cfg.user, pass: cfg.pass },
+    connectionTimeout: 10000,
+    greetingTimeout: 5000,
+    socketTimeout: 10000,
+    pool: true,
+    maxConnections: 1
   });
   return _transporterCache;
 }
@@ -111,7 +116,17 @@ async function sendGuideEmail(to, fileName, docBuffer, preferences) {
     return { ok: true, info: info.messageId };
   } catch (err) {
     console.error(`[EMAIL] 发送失败 (${to}):`, err.message);
-    return { ok: false, reason: err.message };
+    console.error('[EMAIL] 错误详情:', { code: err.code, command: err.command, response: err.response, responseCode: err.responseCode });
+    return {
+      ok: false,
+      reason: err.message,
+      details: {
+        code: err.code,
+        command: err.command,
+        smtpResponse: err.response,
+        smtpResponseCode: err.responseCode
+      }
+    };
   }
 }
 
@@ -343,6 +358,45 @@ if (require.main === module) {
         }, null, 2));
         return;
       }
+      // SMTP 深度诊断：实际测试连接 + 发送测试邮件
+      if (req.url === '/smtp-check') {
+        const cfg = getSmtpConfig();
+        let result = {
+          timestamp: new Date().toISOString(),
+          nodemailerLoaded: !!nodemailer,
+          config: cfg ? { host: cfg.host, port: cfg.port, secure: cfg.secure, user: cfg.user, from: cfg.from } : null
+        };
+        if (!nodemailer) {
+          result.error = 'nodemailer 未加载，请检查 npm install 是否成功';
+        } else if (!cfg) {
+          result.error = 'SMTP 配置缺失';
+        } else {
+          const transporter = getTransporter();
+          if (!transporter) {
+            result.error = 'transporter 创建失败';
+          } else {
+            result.connectionTest = 'pending';
+            try {
+              const verifyResult = await transporter.verify();
+              result.connectionTest = 'success';
+              result.verifyResult = verifyResult;
+            } catch (err) {
+              result.connectionTest = 'failed';
+              result.connectionError = {
+                message: err.message,
+                code: err.code,
+                command: err.command,
+                response: err.response,
+                responseCode: err.responseCode
+              };
+            }
+          }
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result, null, 2));
+        return;
+      }
+
       // Paddle SDK 本地托管（避免 CDN 在国内被 DNS 污染）
       if (req.url === '/paddle.js' || req.url === '/v2/paddle.js') {
         try {
