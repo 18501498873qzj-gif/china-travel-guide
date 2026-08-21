@@ -174,14 +174,21 @@ async function sendGuideEmail(to, fileName, docBuffer, preferences) {
       console.log(`[EMAIL] Resend 发送成功: ${to}`);
       return { ok: true, provider: 'resend', info: emailResult.id };
     } catch (err) {
-      console.warn(`[EMAIL] Resend 发送失败，降级到 SMTP: ${err.message}`);
+      console.warn(`[EMAIL] Resend 发送失败: ${err.message}`);
+      // Resend 失败直接返回错误，不再降级 SMTP（因为已知 Render 上 SMTP 会被阻断）
+      return {
+        ok: false,
+        provider: 'resend',
+        reason: `Resend 发送失败: ${err.message}`,
+        suggestion: '检查 RESEND_API_KEY 是否正确，或发件地址 RESEND_FROM 是否被 Resend 允许'
+      };
     }
   }
 
-  // 降级：使用 SMTP
+  // 无 Resend Key 时才使用 SMTP
   try {
     if (!cfg) {
-      return { ok: false, reason: 'SMTP 未配置（缺少 SMTP_USER / SMTP_PASS）' };
+      return { ok: false, reason: '未配置邮件发送，请先配置 RESEND_API_KEY' };
     }
     if (!nodemailer) {
       return { ok: false, reason: 'nodemailer 未加载（npm install 可能失败）' };
