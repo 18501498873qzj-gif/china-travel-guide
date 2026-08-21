@@ -37,27 +37,48 @@ function getSmtpConfig() {
 }
 
 let _transporterCache = null;
-function getTransporter() {
+async function getTransporter() {
   if (_transporterCache) return _transporterCache;
   const cfg = getSmtpConfig();
   if (!cfg || !nodemailer) return null;
-  _transporterCache = nodemailer.createTransport({
-    host: cfg.host,
-    port: cfg.port,
-    secure: cfg.secure,
-    auth: { user: cfg.user, pass: cfg.pass },
-    connectionTimeout: 10000,
-    greetingTimeout: 5000,
-    socketTimeout: 10000,
-    pool: true,
-    maxConnections: 1
-  });
-  return _transporterCache;
+
+  // 尝试多个端口，提高连接成功率
+  const portOptions = [
+    { port: cfg.port, secure: cfg.secure },      // 用户配置的
+    { port: 465, secure: true },                // Gmail SSL 端口
+    { port: 587, secure: false }                // Gmail TLS 端口
+  ];
+
+  for (const opt of portOptions) {
+    console.log(`[SMTP] 尝试连接 ${cfg.host}:${opt.port} (secure=${opt.secure})`);
+    const transporter = nodemailer.createTransport({
+      host: cfg.host,
+      port: opt.port,
+      secure: opt.secure,
+      auth: { user: cfg.user, pass: cfg.pass },
+      connectionTimeout: 10000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
+      pool: true,
+      maxConnections: 1
+    });
+    try {
+      await transporter.verify();
+      console.log(`[SMTP] 连接成功: ${cfg.host}:${opt.port}`);
+      _transporterCache = transporter;
+      // 记录实际使用的端口
+      transporter._actualPort = opt.port;
+      return transporter;
+    } catch (err) {
+      console.warn(`[SMTP] 端口 ${opt.port} 连接失败: ${err.message}`);
+    }
+  }
+  return null;
 }
 
 async function sendGuideEmail(to, fileName, docBuffer, preferences) {
   try {
-    const transporter = getTransporter();
+    const transporter = await getTransporter();
     const cfg = getSmtpConfig();
     if (!cfg) {
       return { ok: false, reason: 'SMTP 未配置（缺少 SMTP_USER / SMTP_PASS）' };
@@ -371,14 +392,15 @@ if (require.main === module) {
         } else if (!cfg) {
           result.error = 'SMTP 配置缺失';
         } else {
-          const transporter = getTransporter();
+          const transporter = await getTransporter();
           if (!transporter) {
-            result.error = 'transporter 创建失败';
+            result.error = 'transporter 创建失败（所有端口均连接超时或被阻断）';
           } else {
             result.connectionTest = 'pending';
             try {
               const verifyResult = await transporter.verify();
               result.connectionTest = 'success';
+              result.actualPort = transporter._actualPort;
               result.verifyResult = verifyResult;
             } catch (err) {
               result.connectionTest = 'failed';
