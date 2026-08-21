@@ -238,17 +238,56 @@ textarea { resize: vertical; min-height: 60px; }
 <a href="/" class="back">← Back to Home</a>
 </div>
 
-<!-- Paddle SDK (本地托管，避免 CDN 在国内被 DNS 污染) -->
-<script src="/paddle.js"></script>
+<!-- Paddle SDK 延迟加载，不在页面加载时初始化（避免 Paddle SDK 在国内网络下弹出错误页） -->
 <script>
-let paddleAvailable = false;
-try {
-  if (typeof Paddle !== 'undefined' && Paddle.Checkout) {
-    Paddle.Environment.set('live');
-    Paddle.Initialize({ token: 'live_8de9d646e470503d57b4c3cdc60' });
-    paddleAvailable = true;
+let paddleAvailable = null; // null = 未检测，true/false = 已检测
+
+async function ensurePaddle() {
+  if (paddleAvailable === true) return true;
+  if (paddleAvailable === false) return false;
+
+  // 动态加载 paddle.js
+  await new Promise((resolve) => {
+    if (document.getElementById('paddleScript')) return resolve();
+    const s = document.createElement('script');
+    s.id = 'paddleScript';
+    s.src = '/paddle.js';
+    s.onload = resolve;
+    s.onerror = resolve; // 加载失败继续
+    document.head.appendChild(s);
+  });
+
+  // 等脚本执行完
+  await new Promise(r => setTimeout(r, 300));
+
+  if (typeof Paddle === 'undefined' || !Paddle.Checkout) {
+    paddleAvailable = false;
+    return false;
   }
-} catch(e) { paddleAvailable = false; }
+
+  // 尝试初始化（会连接 live.paddle.com 验证 token）
+  try {
+    const initPromise = new Promise((resolve, reject) => {
+      Paddle.Environment.set('live');
+      Paddle.Initialize({
+        token: 'live_8de9d646e470503d57b4c3cdc60',
+        onUpdate: () => {},
+        onCheckoutClose: () => {}
+      });
+      // Paddle 初始化成功回调
+      if (Paddle.Checkout) resolve(true);
+      else setTimeout(() => resolve(true), 500);
+    });
+
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(false), 3000));
+    const result = await Promise.race([initPromise, timeout]);
+    paddleAvailable = result;
+    return result;
+  } catch(e) {
+    paddleAvailable = false;
+    return false;
+  }
+}
 
 // Simulated Paddle Checkout (for regions where Paddle is blocked)
 function openSimulatedCheckout(data) {
@@ -416,7 +455,7 @@ function validateForm(data) {
 }
 
 // Buy button → open Paddle checkout
-document.getElementById('buyBtn').addEventListener('click', () => {
+document.getElementById('buyBtn').addEventListener('click', async () => {
   const data = collectFormData();
   const err = validateForm(data);
   if (err) {
@@ -428,7 +467,19 @@ document.getElementById('buyBtn').addEventListener('click', () => {
   // Save form data to sessionStorage for retrieval after redirect
   sessionStorage.setItem('orderFormData', JSON.stringify(data));
 
-  if (!paddleAvailable || typeof Paddle === 'undefined') {
+  // Show loading state
+  const btn = document.getElementById('buyBtn');
+  const originalText = btn.textContent;
+  btn.textContent = 'Loading checkout...';
+  btn.disabled = true;
+
+  // Try to load Paddle (3 second timeout)
+  const available = await ensurePaddle();
+
+  btn.textContent = originalText;
+  btn.disabled = false;
+
+  if (!available) {
     // Paddle blocked in this region — show simulated checkout
     openSimulatedCheckout(data);
     return;
