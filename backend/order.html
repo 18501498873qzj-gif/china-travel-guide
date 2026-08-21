@@ -215,18 +215,24 @@ textarea { resize: vertical; min-height: 60px; }
 <!-- Success view -->
 <div id="successView" style="display:none;">
   <div class="card">
-    <div class="success-box" id="successBox">
-      <div class="check">✅</div>
-      <h1>Payment Successful!</h1>
-      <p style="color:#666;margin-top:0.3rem;">Generating your personalized travel guide...</p>
+    <div class="success-box">
+      <div class="check" id="successIcon">✅</div>
+      <h1 id="successTitle">Payment Successful!</h1>
+      <p id="successSub" style="color:#666;margin-top:0.3rem;"></p>
     </div>
-    <div id="genStatus" style="text-align:center;padding:1.5rem;">
-      <div class="spinner"></div>
-      <p style="margin-top:0.8rem;color:#888;font-size:0.9rem;">AI is creating your guide (60-120 seconds)...</p>
+    <div id="emailNotice" style="text-align:center;padding:1.5rem 1rem;">
+      <div style="background:#f0f7ff;border-radius:12px;padding:1.2rem;border:1px solid #d0e4ff;">
+        <div style="font-size:1.5rem;margin-bottom:0.5rem;">📧</div>
+        <p id="emailNoticeText" style="color:#333;font-size:0.95rem;line-height:1.7;"></p>
+        <p id="emailNoticeSub" style="color:#888;font-size:0.8rem;margin-top:0.5rem;"></p>
+      </div>
     </div>
-    <div id="genResult" style="display:none;text-align:center;padding:1rem;">
-      <p id="resultText"></p>
-      <a href="/" class="back" style="margin-top:1rem;display:inline-block;">← Back to Home</a>
+    <div id="downloadSection" style="display:none;text-align:center;padding:0 1rem 1rem;">
+      <p style="color:#888;font-size:0.8rem;margin-bottom:0.8rem;" id="downloadHint"></p>
+      <button id="downloadBtn" class="btn" style="max-width:260px;margin:0 auto;font-size:0.95rem;padding:0.7rem 1rem;">📥 <span id="downloadBtnText">Download .doc now</span></button>
+    </div>
+    <div style="text-align:center;padding:0 1rem 1rem;">
+      <a href="/" class="back" style="display:inline-block;" id="backLink">← Back to Home</a>
     </div>
     <div id="genError" style="display:none;text-align:center;padding:1rem;">
       <p class="error-msg" id="errorText"></p>
@@ -506,6 +512,34 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
   });
 });
 
+// ---- Multi-language success messages ----
+const SUCCESS_I18N = {
+  'English': { title: 'Payment Successful!', sub: 'Thank you for your purchase.', notice: 'Your personalized travel guide will be sent to <strong>{email}</strong> within 30 minutes. Please check your inbox (including spam/junk folder).', noticeSub: 'If you do not receive it within 1 hour, please contact support.', downloadHint: 'Want your guide right now?', downloadBtn: '📥 Download .doc now', back: '← Back to Home' },
+  'English (UK)': { title: 'Payment Successful!', sub: 'Thank you for your purchase.', notice: 'Your personalised travel guide will be sent to <strong>{email}</strong> within 30 minutes. Please check your inbox (including spam/junk folder).', noticeSub: 'If you do not receive it within 1 hour, please contact support.', downloadHint: 'Want your guide right now?', downloadBtn: '📥 Download .doc now', back: '← Back to Home' },
+  'English (AU)': { title: 'Payment Successful!', sub: 'Thank you for your purchase.', notice: 'Your personalised travel guide will be sent to <strong>{email}</strong> within 30 minutes. Please check your inbox (including spam/junk folder).', noticeSub: 'If you do not receive it within 1 hour, please contact support.', downloadHint: 'Want your guide right now?', downloadBtn: '📥 Download .doc now', back: '← Back to Home' },
+  'English (CA)': { title: 'Payment Successful!', sub: 'Thank you for your purchase.', notice: 'Your personalized travel guide will be sent to <strong>{email}</strong> within 30 minutes. Please check your inbox (including spam/junk folder).', noticeSub: 'If you do not receive it within 1 hour, please contact support.', downloadHint: 'Want your guide right now?', downloadBtn: '📥 Download .doc now', back: '← Back to Home' },
+  '中文': { title: '支付成功！', sub: '感谢您的购买。', notice: '您的专属旅行攻略将在<strong>30分钟内</strong>发送至 <strong>{email}</strong>，请注意查收（含垃圾邮件文件夹）。', noticeSub: '若1小时内未收到，请联系客服。', downloadHint: '想立即获取攻略？', downloadBtn: '📥 立即下载 .doc', back: '← 返回首页' },
+  '中文(繁体)': { title: '支付成功！', sub: '感謝您的購買。', notice: '您的專屬旅行攻略將在<strong>30分鐘內</strong>發送至 <strong>{email}</strong>，請注意查收（含垃圾郵件資料夾）。', noticeSub: '若1小時內未收到，請聯繫客服。', downloadHint: '想立即獲取攻略？', downloadBtn: '📥 立即下載 .doc', back: '← 返回首頁' },
+  '日本語': { title: '決済完了！', sub: 'ご購入ありがとうございました。', notice: 'パーソナライズされた旅行ガイドを、<strong>30分以内</strong>に <strong>{email}</strong> へ送信いたします。受信トレイ（迷惑メール含む）をご確認ください。', noticeSub: '1時間以内に届かない場合は、サポートまでご連絡ください。', downloadHint: '今すぐガイドが必要ですか？', downloadBtn: '📥 .docを今すぐダウンロード', back: '← ホームに戻る' },
+  '한국어': { title: '결제 완료!', sub: '구매해 주셔서 감사합니다.', notice: '개인 맞춤 여행 가이드가 <strong>30분 이내</strong>에 <strong>{email}</strong>로 전송될 예정입니다. 받은 편지함(스팸 포함)을 확인해 주세요.', noticeSub: '1시간 내에 받지 못하시면 고객센터로 문의해 주세요.', downloadHint: '지금 가이드를 받고 싶으신가요?', downloadBtn: '📥 .doc 지금 다운로드', back: '← 홈으로 돌아가기' },
+  'Français': { title: 'Paiement réussi !', sub: 'Merci pour votre achat.', notice: 'Votre guide de voyage personnalisé sera envoyé à <strong>{email}</strong> sous 30 minutes. Vérifiez votre boîte de réception (y compris les spams).', noticeSub: 'Si vous ne le recevez pas sous 1 heure, contactez le support.', downloadHint: 'Vous voulez votre guide maintenant ?', downloadBtn: '📥 Télécharger .doc maintenant', back: '← Retour à l\'accueil' },
+  'Deutsch': { title: 'Zahlung erfolgreich!', sub: 'Vielen Dank für Ihren Einkauf.', notice: 'Ihr personalisierter Reiseleitfaden wird innerhalb von <strong>30 Minuten</strong> an <strong>{email}</strong> gesendet. Bitte prüfen Sie Ihren Posteingang (inkl. Spam-Ordner).', noticeSub: 'Wenn Sie ihn nicht innerhalb von 1 Stunde erhalten, kontaktieren Sie den Support.', downloadHint: 'Möchten Sie Ihren Leitfaden jetzt?', downloadBtn: '📥 .doc jetzt herunterladen', back: '← Zurück zur Startseite' },
+  'Español': { title: '¡Pago exitoso!', sub: 'Gracias por tu compra.', notice: 'Tu guía de viaje personalizada será enviada a <strong>{email}</strong> en un plazo de 30 minutos. Revisa tu bandeja de entrada (incluyendo spam).', noticeSub: 'Si no la recibes en 1 hora, contacta al soporte.', downloadHint: '¿Quieres tu guía ahora?', downloadBtn: '📥 Descargar .doc ahora', back: '← Volver al inicio' },
+  'Español (MX)': { title: '¡Pago exitoso!', sub: 'Gracias por tu compra.', notice: 'Tu guía de viaje personalizada será enviada a <strong>{email}</strong> en un plazo de 30 minutos. Revisa tu bandeja de entrada (incluyendo spam).', noticeSub: 'Si no la recibes en 1 hora, contacta al soporte.', downloadHint: '¿Quieres tu guía ahora?', downloadBtn: '📥 Descargar .doc ahora', back: '← Volver al inicio' },
+  'Italiano': { title: 'Pagamento riuscito!', sub: 'Grazie per il tuo acquisto.', notice: 'La tua guida di viaggio personalizzata sarà inviata a <strong>{email}</strong> entro 30 minuti. Controlla la tua casella di posta (incluso spam).', noticeSub: 'Se non la ricevi entro 1 ora, contatta il supporto.', downloadHint: 'Vuoi la tua guida ora?', downloadBtn: '📥 Scarica .doc ora', back: '← Torna alla home' },
+  'Português': { title: 'Pagamento bem-sucedido!', sub: 'Obrigado pela sua compra.', notice: 'O seu guia de viagem personalizado será enviado para <strong>{email}</strong> dentro de 30 minutos. Verifique a sua caixa de entrada (incluindo spam).', noticeSub: 'Se não o receber dentro de 1 hora, contacte o suporte.', downloadHint: 'Quer o seu guia agora?', downloadBtn: '📥 Baixar .doc agora', back: '← Voltar ao início' },
+  'Português (BR)': { title: 'Pagamento bem-sucedido!', sub: 'Obrigado pela sua compra.', notice: 'O seu guia de viagem personalizado será enviado para <strong>{email}</strong> em até 30 minutos. Verifique a sua caixa de entrada (incluindo spam).', noticeSub: 'Se não o receber em 1 hora, entre em contato com o suporte.', downloadHint: 'Quer o seu guia agora?', downloadBtn: '📥 Baixar .doc agora', back: '← Voltar ao início' },
+  'Русский': { title: 'Оплата прошла успешно!', sub: 'Спасибо за покупку.', notice: 'Ваш персональный путеводитель будет отправлен на <strong>{email}</strong> в течение 30 минут. Проверьте почту (включая спам).', noticeSub: 'Если вы не получите его в течение 1 часа, свяжитесь с поддержкой.', downloadHint: 'Хотите получить путеводитель сейчас?', downloadBtn: '📥 Скачать .doc сейчас', back: '← На главную' },
+  'ไทย': { title: 'ชำระเงินสำเร็จ!', sub: 'ขอบคุณสำหรับการซื้อของคุณ', notice: 'คู่มือการเดินทางส่วนตัวของคุณจะถูกส่งไปที่ <strong>{email}</strong> ภายใน 30 นาที โปรดตรวจสอบกล่องจดหมายของคุณ (รวมถึงสแปม)', noticeSub: 'หากไม่ได้รับภายใน 1 ชั่วโมง โปรดติดต่อฝ่ายช่วยเหลือ', downloadHint: 'ต้องการคู่มือตอนนี้ไหม?', downloadBtn: '📥 ดาวน์โหลด .doc ตอนนี้', back: '← กลับไปยังหน้าแรก' },
+  'Tiếng Việt': { title: 'Thanh toán thành công!', sub: 'Cảm ơn bạn đã mua hàng.', notice: 'Hướng dẫn du lịch cá nhân hóa của bạn sẽ được gửi tới <strong>{email}</strong> trong vòng 30 phút. Vui lòng kiểm tra hộp thư đến (bao gồm cả thư rác).', noticeSub: 'Nếu không nhận được trong 1 giờ, vui lòng liên hệ bộ phận hỗ trợ.', downloadHint: 'Muốn nhận hướng dẫn ngay bây giờ?', downloadBtn: '📥 Tải .doc ngay', back: '← Quay lại trang chủ' },
+  'Bahasa Indonesia': { title: 'Pembayaran Berhasil!', sub: 'Terima kasih atas pembelian Anda.', notice: 'Panduan perjalanan pribadi Anda akan dikirim ke <strong>{email}</strong> dalam waktu 30 menit. Silakan periksa kotak masuk Anda (termasuk spam).', noticeSub: 'Jika tidak diterima dalam 1 jam, hubungi dukungan.', downloadHint: 'Inginkan panduan Anda sekarang?', downloadBtn: '📥 Unduh .doc sekarang', back: '← Kembali ke beranda' },
+  'Bahasa Melayu': { title: 'Pembayaran Berjaya!', sub: 'Terima kasih atas pembelian anda.', notice: 'Panduan perjalanan peribadi anda akan dihantar ke <strong>{email}</strong> dalam tempoh 30 minit. Sila semak peti masuk anda (termasuk spam).', noticeSub: 'Jika tidak diterima dalam 1 jam, hubungi sokongan.', downloadHint: 'Inginkan panduan anda sekarang?', downloadBtn: '📥 Muat turun .doc sekarang', back: '← Kembali ke laman utama' },
+  'Filipino': { title: 'Matagumpay ang Pagbabayad!', sub: 'Salamat sa iyong pagbili.', notice: 'Ang iyong personalized na gabay sa paglalakbay ay ipapadala sa <strong>{email}</strong> sa loob ng 30 minuto. Pakisuri ang iyong inbox (kasama ang spam).', noticeSub: 'Kung hindi natanggap sa loob ng 1 oras, makipag-ugnayan sa suporta.', downloadHint: 'Gusto mo ba ang gabay ngayon?', downloadBtn: '📥 I-download ang .doc ngayon', back: '← Bumalik sa home' },
+  'हिन्दी': { title: 'भुगतान सफल!', sub: 'आपकी खरीद के लिए धन्यवाद।', notice: 'आपकी व्यक्तिगत यात्रा गाइड <strong>30 मिनट के भीतर</strong> <strong>{email}</strong> पर भेजी जाएगी। कृपया अपना इनबॉक्स (स्पैम सहित) जांचें।', noticeSub: 'यदि 1 घंटे में प्राप्त नहीं होती है, तो सहायता से संपर्क करें।', downloadHint: 'अभी गाइड चाहते हैं?', downloadBtn: '📥 .doc अभी डाउनलोड करें', back: '← होम पर वापस' },
+  'العربية': { title: 'تم الدفع بنجاح!', sub: 'شكراً لعملية الشراء.', notice: 'سيتم إرسال دليل السفر المخصص الخاص بك إلى <strong>{email}</strong> خلال 30 دقيقة. يرجى التحقق من صندوق الوارد الخاص بك (بما في ذلك الرسائل العشوائية).', noticeSub: 'إذا لم تستلمه خلال ساعة، يرجى الاتصال بالدعم.', downloadHint: 'هل تريد دليلك الآن؟', downloadBtn: '📥 تحميل .doc الآن', back: '← العودة إلى الرئيسية' },
+  'Türkçe': { title: 'Ödeme Başarılı!', sub: 'Satın almanız için teşekkürler.', notice: 'Kişiselleştirilmiş seyahat rehberiniz <strong>30 dakika içinde</strong> <strong>{email}</strong> adresine gönderilecek. Lütfen gelen kutunuzu (spam dahil) kontrol edin.', noticeSub: '1 saat içinde almazsanız destekle iletişime geçin.', downloadHint: 'Rehberinizi şimdi mi istiyorsunuz?', downloadBtn: '📥 .doc dosyasını şimdi indir', back: '← Ana sayfaya geri dön' }
+};
+
 // ---- Success page logic ----
 if (new URLSearchParams(window.location.search).get('success') === 'true') {
   document.getElementById('formView').style.display = 'none';
@@ -513,13 +547,28 @@ if (new URLSearchParams(window.location.search).get('success') === 'true') {
 
   const savedData = sessionStorage.getItem('orderFormData');
   if (!savedData) {
-    // No form data — show generic success (user may have reopened the URL)
-    document.getElementById('genStatus').style.display = 'none';
-    document.getElementById('genResult').style.display = 'block';
-    document.getElementById('resultText').innerHTML = '✅ Payment received! Your guide is being processed and will be emailed to you shortly.';
+    // No form data — show generic success
+    const t = SUCCESS_I18N['English'];
+    document.getElementById('successTitle').textContent = t.title;
+    document.getElementById('successSub').textContent = t.sub;
+    document.getElementById('emailNoticeText').innerHTML = t.notice.replace('{email}', 'your email');
+    document.getElementById('emailNoticeSub').textContent = t.noticeSub;
+    document.getElementById('backLink').textContent = t.back;
+    document.getElementById('downloadSection').style.display = 'none';
   } else {
-    // Have form data — auto-call backend API to generate guide
     const formData = JSON.parse(savedData);
+    const lang = formData.language || 'English';
+    const t = SUCCESS_I18N[lang] || SUCCESS_I18N['English'];
+    const email = formData.email || '';
+
+    // Show localized success immediately
+    document.getElementById('successTitle').textContent = t.title;
+    document.getElementById('successSub').textContent = t.sub;
+    document.getElementById('emailNoticeText').innerHTML = t.notice.replace('{email}', email);
+    document.getElementById('emailNoticeSub').textContent = t.noticeSub;
+    document.getElementById('backLink').textContent = t.back;
+
+    // Build API preferences
     const preferences = {
       cities: formData.cities,
       days: formData.days,
@@ -538,11 +587,7 @@ if (new URLSearchParams(window.location.search).get('success') === 'true') {
       firstCity: formData.cities[0] || ''
     };
 
-    document.getElementById('successBox').innerHTML =
-      '<div class="check">✅</div><h1>Payment Successful!</h1><p style="color:#666;margin-top:0.3rem;">Generating guide for: ' +
-      formData.cities.join(', ') + ' · ' + formData.days + ' days</p>';
-
-    // Call backend API
+    // Fire API call in background (fire-and-forget for email delivery)
     fetch('/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -550,42 +595,35 @@ if (new URLSearchParams(window.location.search).get('success') === 'true') {
     })
     .then(res => res.json().then(data => ({ ok: res.ok, data })))
     .then(({ ok, data }) => {
-      document.getElementById('genStatus').style.display = 'none';
       if (!ok) throw new Error(data.error || 'Generation failed');
 
-      // Trigger browser download of the .doc
+      // Show download button for instant access
       if (data.docBase64) {
-        const binary = atob(data.docBase64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const blob = new Blob([bytes], { type: 'application/msword' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = data.fileName || 'travel-guide.doc';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        document.getElementById('downloadHint').textContent = t.downloadHint;
+        document.getElementById('downloadBtnText').textContent = t.downloadBtn;
+        document.getElementById('downloadSection').style.display = 'block';
+
+        document.getElementById('downloadBtn').onclick = () => {
+          const binary = atob(data.docBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], { type: 'application/msword' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = data.fileName || 'travel-guide.doc';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
       }
 
-      let html = '🎉 <strong>Your guide is ready!</strong><br>';
-      html += 'The .doc file has been downloaded to your device.<br>';
-      if (data.email && data.email.ok) {
-        html += '✅ A copy has also been sent to <strong>' + formData.email + '</strong>';
-      } else if (data.email && !data.email.ok) {
-        html += '⚠️ Email delivery failed: ' + (data.email.reason || 'unknown error');
-      }
-      document.getElementById('resultText').innerHTML = html;
-      document.getElementById('genResult').style.display = 'block';
-
-      // Clear sessionStorage
       sessionStorage.removeItem('orderFormData');
     })
     .catch(err => {
-      document.getElementById('genStatus').style.display = 'none';
-      document.getElementById('errorText').textContent = '❌ Guide generation failed: ' + err.message + '. Please contact 18501498873qzj@gmail.com — your payment was successful and we will manually generate your guide.';
-      document.getElementById('genError').style.display = 'block';
+      // Don't show error to user — email will still be delivered by webhook
+      console.warn('Generation API error (non-critical):', err.message);
       sessionStorage.removeItem('orderFormData');
     });
   }
