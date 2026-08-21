@@ -603,7 +603,9 @@ if (require.main === module) {
             FEISHU_APP_ID: process.env.FEISHU_APP_ID ? '✅ 已配置' : '❌ 未配置',
             FEISHU_APP_SECRET: process.env.FEISHU_APP_SECRET ? '✅ 已配置' : '❌ 未配置',
             FEISHU_APP_TOKEN: process.env.FEISHU_APP_TOKEN ? '✅ 已配置' : '❌ 未配置',
-            FEISHU_TABLE_ID: process.env.FEISHU_TABLE_ID ? '✅ 已配置' : '❌ 未配置'
+            FEISHU_TABLE_ID: process.env.FEISHU_TABLE_ID ? '✅ 已配置' : '❌ 未配置',
+            PADDLE_WEBHOOK_SECRET: process.env.PADDLE_WEBHOOK_SECRET ? `✅ 已配置（长度: ${process.env.PADDLE_WEBHOOK_SECRET.length} 字符）` : '❌ 未配置（⭐ 必做！防止伪造 Webhook 请求）',
+            PADDLE_CLIENT_TOKEN: process.env.PADDLE_CLIENT_TOKEN ? '✅ 已配置' : '❌ 未配置'
           }
         }, null, 2));
         return;
