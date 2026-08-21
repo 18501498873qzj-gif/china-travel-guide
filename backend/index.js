@@ -299,10 +299,26 @@ if (require.main === module) {
 
       // GET 路由
     if (req.method === 'GET') {
-      // Health check
-      if (req.url === '/health' || req.url === '/healthz') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+      // Health check + SMTP 诊断
+      if (req.url === '/health' || req.url === '/healthz' || req.url === '/diagnose') {
+        const cfg = getSmtpConfig();
+        const smtpStatus = cfg
+          ? { ok: true, host: cfg.host, port: cfg.port, user: cfg.user, from: cfg.from, nodemailer: !!nodemailer }
+          : { ok: false, reason: 'SMTP 未配置，缺少 SMTP_USER / SMTP_PASS 环境变量', nodemailer: !!nodemailer };
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          status: 'ok',
+          uptime: process.uptime(),
+          smtp: smtpStatus,
+          env: {
+            NODE_ENV: process.env.NODE_ENV || 'development',
+            DEEPSEEK_KEY: process.env.DEEPSEEK_API_KEY ? '已配置' : '未配置',
+            FEISHU_APP_ID: process.env.FEISHU_APP_ID ? '已配置' : '未配置',
+            FEISHU_APP_SECRET: process.env.FEISHU_APP_SECRET ? '已配置' : '未配置',
+            FEISHU_APP_TOKEN: process.env.FEISHU_APP_TOKEN ? '已配置' : '未配置',
+            FEISHU_TABLE_ID: process.env.FEISHU_TABLE_ID ? '已配置' : '未配置'
+          }
+        }, null, 2));
         return;
       }
       // Paddle SDK 本地托管（避免 CDN 在国内被 DNS 污染）
@@ -455,6 +471,35 @@ if (require.main === module) {
           console.error('[WEBHOOK ERROR]', err);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ received: true }));
+        }
+      });
+      return;
+    }
+
+    // POST /test-email — SMTP 测试端点
+    if (req.method === 'POST' && req.url === '/test-email') {
+      let chunks = '';
+      req.on('data', c => chunks += c);
+      req.on('end', async () => {
+        let body = {};
+        try { body = JSON.parse(chunks); } catch(e) {}
+        const to = body.to || body.email;
+        if (!to) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: '缺少收件人邮箱 (to)' }));
+          return;
+        }
+        try {
+          const result = await sendGuideEmail(to, 'smtp-test.doc', Buffer.from('test'), {
+            days: 7, cities: ['Beijing'], language: 'English', travelers: '2',
+            arrivalDate: new Date().toISOString().split('T')[0], hotelPref: '-',
+            transportPref: '-', budget: 'Economy', interests: ['Culture']
+          });
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: true, ...result }));
+        } catch(err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: err.message }));
         }
       });
       return;
