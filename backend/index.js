@@ -298,6 +298,17 @@ if (require.main === module) {
 
       // GET 路由
     if (req.method === 'GET') {
+      // Paddle SDK 本地托管（避免 CDN 在国内被 DNS 污染）
+      if (req.url === '/paddle.js' || req.url === '/v2/paddle.js') {
+        try {
+          const js = fs.readFileSync(path.join(__dirname, 'paddle.js'), 'utf-8');
+          res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+          res.end(js);
+        } catch (err) {
+          res.writeHead(404); res.end('not found');
+        }
+        return;
+      }
       // 订单页面
       if (req.url === '/order' || req.url === '/order.html' || req.url.startsWith('/order?')) {
         try {
