@@ -26,6 +26,17 @@ const { SYSTEM_PROMPT, buildUserPrompt, buildLocalizedFileInfo } = require('./pr
 const currency = require('./currency');
 
 // ---------- 邮件发送 ----------
+// 把 "Name <email@x.com>" 格式解析成 SendGrid 需要的 { email, name }
+function parseFromAddress(fromStr) {
+  if (!fromStr) return { email: '18501498873qzj@gmail.com' };
+  const match = fromStr.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  if (match) {
+    const name = match[1].trim();
+    return name ? { email: match[2].trim(), name } : { email: match[2].trim() };
+  }
+  return { email: fromStr.trim() };
+}
+
 function getSmtpConfig() {
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = Number(process.env.SMTP_PORT) || 587;
@@ -116,7 +127,74 @@ async function sendGuideEmail(to, fileName, docBuffer, preferences) {
     </div>
   `;
 
-  // 优先使用 Resend API（HTTP 方式，不受 SMTP 端口限制）
+  // 🥇 优先使用 SendGrid API（HTTP 方式，支持单邮箱验证 → 无需域名即可发给任意用户）
+  const sendgridKey = process.env.SENDGRID_API_KEY;
+  if (sendgridKey) {
+    try {
+      const fileBase64 = docBuffer.toString('base64');
+      const sendgridFrom = process.env.SENDGRID_FROM || '"China Travel Guide" <18501498873qzj@gmail.com>';
+      const body = JSON.stringify({
+        personalizations: [{
+          to: [{ email: to }],
+          subject: subject
+        }],
+        from: parseFromAddress(sendgridFrom),
+        content: [{
+          type: 'text/html',
+          value: emailHtml
+        }],
+        attachments: [{
+          filename: fileName,
+          content: fileBase64,
+          type: 'application/msword',
+          disposition: 'attachment'
+        }]
+      });
+
+      const reqOptions = {
+        hostname: 'api.sendgrid.com',
+        path: '/v3/mail/send',
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sendgridKey}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        },
+        timeout: 20000
+      };
+
+      const emailResult = await new Promise((resolve, reject) => {
+        const req = https.request(reqOptions, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              resolve({ ok: true, provider: 'sendgrid', statusCode: res.statusCode, xMessageId: res.headers['x-message-id'] });
+            } else {
+              reject(new Error(`SendGrid API error (${res.statusCode}): ${data || 'empty body'}`));
+            }
+          });
+        });
+        req.on('error', reject);
+        req.on('timeout', () => req.destroy(new Error('SendGrid API timeout (20s)')));
+        req.write(body);
+        req.end();
+      });
+
+      console.log(`[EMAIL] SendGrid 发送成功: ${to}`);
+      return { ok: true, provider: 'sendgrid', info: emailResult.xMessageId };
+    } catch (err) {
+      console.warn(`[EMAIL] SendGrid 发送失败: ${err.message}`);
+      return {
+        ok: false,
+        provider: 'sendgrid',
+        reason: `SendGrid 发送失败: ${err.message}`,
+        suggestion: '检查 SENDGRID_API_KEY 是否正确，或确认 18501498873qzj@gmail.com 是否已在 SendGrid 里做 Single Sender Verification'
+      };
+    }
+  }
+
+  // 🥈 降级使用 Resend API（HTTP 方式，不受 SMTP 端口限制）
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
     try {
@@ -418,6 +496,7 @@ if (require.main === module) {
         const hasUser = !!process.env.SMTP_USER;
         const hasPass = !!process.env.SMTP_PASS;
         const hasResendKey = !!process.env.RESEND_API_KEY;
+        const hasSendgridKey = !!process.env.SENDGRID_API_KEY;
         let smtpStatus;
         if (!hasNodemailer) {
           smtpStatus = { ok: false, reason: 'nodemailer 未加载', level: 'error' };
@@ -426,9 +505,16 @@ if (require.main === module) {
         } else {
           smtpStatus = { ok: true, host: cfg.host, port: cfg.port, user: cfg.user, from: cfg.from, nodemailer: true, level: 'ok' };
         }
-        const emailStatus = hasResendKey
-          ? { ok: true, provider: 'Resend (HTTP API)', from: process.env.RESEND_FROM || 'onboarding@resend.dev', level: 'ok', note: '推荐！不受 SMTP 端口限制' }
-          : (smtpStatus.ok ? { ok: true, provider: 'SMTP', level: 'ok', note: '可能存在端口被阻断风险' } : { ok: false, provider: '未配置', level: 'error', note: '建议配置 RESEND_API_KEY' });
+        let emailStatus;
+        if (hasSendgridKey) {
+          emailStatus = { ok: true, provider: 'SendGrid (HTTP API)', from: process.env.SENDGRID_FROM || '"China Travel Guide" <18501498873qzj@gmail.com>', level: 'ok', note: '✅ 最佳！无需域名，单邮箱验证即可发给任意用户' };
+        } else if (hasResendKey) {
+          emailStatus = { ok: true, provider: 'Resend (HTTP API)', from: process.env.RESEND_FROM || 'onboarding@resend.dev', level: 'ok', note: '需验证域名才能发任意邮箱' };
+        } else if (smtpStatus.ok) {
+          emailStatus = { ok: true, provider: 'SMTP', level: 'ok', note: '可能存在端口被阻断风险' };
+        } else {
+          emailStatus = { ok: false, provider: '未配置', level: 'error', note: '建议配置 SENDGRID_API_KEY（无需域名）' };
+        }
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({
           status: 'ok',
@@ -437,7 +523,9 @@ if (require.main === module) {
           email: emailStatus,
           env: {
             NODE_ENV: process.env.NODE_ENV || 'development',
-            RESEND_API_KEY: hasResendKey ? '✅ 已配置' : '❌ 未配置（建议配置）',
+            SENDGRID_API_KEY: hasSendgridKey ? '✅ 已配置' : '❌ 未配置（推荐！无需域名）',
+            SENDGRID_FROM: process.env.SENDGRID_FROM ? process.env.SENDGRID_FROM : '"China Travel Guide" <18501498873qzj@gmail.com>（默认）',
+            RESEND_API_KEY: hasResendKey ? '✅ 已配置' : '❌ 未配置',
             RESEND_FROM: process.env.RESEND_FROM ? process.env.RESEND_FROM : 'onboarding@resend.dev（默认）',
             DEEPSEEK_KEY: process.env.DEEPSEEK_API_KEY ? '✅ 已配置' : '❌ 未配置',
             FEISHU_APP_ID: process.env.FEISHU_APP_ID ? '✅ 已配置' : '❌ 未配置',
