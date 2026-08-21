@@ -707,6 +707,18 @@
     ? ''
     : 'http://localhost:3000';
 
+  // ---------- 管理员模式：从 URL ?admin_key=xxx 提取密钥，生成时自动注入 admin_secret ----------
+  const urlParams = new URLSearchParams(window.location.search);
+  const ADMIN_SECRET = urlParams.get('admin_key') || '';
+  if (ADMIN_SECRET) {
+    (function addAdminBadge(){
+      const badge = document.createElement('div');
+      badge.style.cssText = 'position:fixed;top:10px;right:10px;z-index:9999;background:#9B2335;color:#F5EFE0;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;box-shadow:0 4px 12px rgba(155,35,53,.35);font-family:"Inter",sans-serif;letter-spacing:.5px;';
+      badge.textContent = '🔒 Admin Mode · 管理员内测通道';
+      document.body.appendChild(badge);
+    })();
+  }
+
   document.getElementById('generateBtn').addEventListener('click', async () => {
     const cities = document.getElementById('cities').value.trim()
       .split(/[,，]/).map(s => s.trim()).filter(Boolean);
@@ -749,10 +761,12 @@
     }
 
     try {
+      const payload = { preferences, format: 'doc' };
+      if (ADMIN_SECRET) payload.admin_secret = ADMIN_SECRET;
       const res = await fetch(`${API_URL}/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ preferences, format: 'doc' })
+        body: JSON.stringify(payload)
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: '请求失败 / Request failed' }));

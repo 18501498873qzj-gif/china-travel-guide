@@ -5,8 +5,20 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const https = require('https');
+const crypto = require('crypto');
 let nodemailer = null;
 try { nodemailer = require('nodemailer'); } catch (e) { /* nodemailer 可选，没装也不影响核心功能 */ }
+
+// ---------- 安全层：临时一次性生成令牌（order 成功页调用 POST / 时用）----------
+// key: token 随机串, value: { expireAt: ms, used: false }
+const TEMP_TOKEN_TTL_MS = 3 * 60 * 1000; // 3 分钟内一次性有效
+const tempTokens = new Map();
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of tempTokens.entries()) {
+    if (now > v.expireAt) tempTokens.delete(k);
+  }
+}, 60 * 1000).unref(); // 每 1 分钟清理一次，unref 不阻塞进程退出
 
 // 本地开发：加载 .env 文件（无需 dotenv 依赖）
 if (process.env.NODE_ENV !== 'production') {
@@ -409,7 +421,31 @@ exports.handler = async (event, context) => {
     if (typeof body === 'string') {
       body = JSON.parse(body);
     }
-    const { preferences, format = 'doc' } = body;
+    const { preferences, format = 'doc', admin_secret = null, generate_token = null } = body;
+
+    // 🔒 访问控制：必须满足以下任一条件才能生成攻略（否则 403）
+    const allowAdmin = process.env.ADMIN_GENERATE_KEY
+      && typeof admin_secret === 'string'
+      && admin_secret.length > 0
+      && admin_secret === process.env.ADMIN_GENERATE_KEY;
+
+    let allowPaidToken = false;
+    if (typeof generate_token === 'string' && generate_token.length > 0) {
+      const rec = tempTokens.get(generate_token);
+      if (rec && !rec.used && Date.now() < rec.expireAt) {
+        rec.used = true; // 一次性，用完作废
+        tempTokens.set(generate_token, rec);
+        allowPaidToken = true;
+      }
+    }
+
+    if (!allowAdmin && !allowPaidToken) {
+      console.warn('[SECURITY] 未付费/未授权访问 POST / 已拦截。是否带 admin_secret 或 generate_token？');
+      return jsonRes(403, {
+        error: 'Payment required. Please purchase through /order first.',
+        hint_zh: '必须先在 /order 页面完成支付，才能生成攻略。管理员可设置 ADMIN_GENERATE_KEY 环境变量并传入 admin_secret 参数。'
+      });
+    }
 
     if (!preferences || !preferences.cities || !preferences.days) {
       return jsonRes(400, { error: '缺少必要参数：cities, days' });
@@ -604,8 +640,10 @@ if (require.main === module) {
             FEISHU_APP_SECRET: process.env.FEISHU_APP_SECRET ? '✅ 已配置' : '❌ 未配置',
             FEISHU_APP_TOKEN: process.env.FEISHU_APP_TOKEN ? '✅ 已配置' : '❌ 未配置',
             FEISHU_TABLE_ID: process.env.FEISHU_TABLE_ID ? '✅ 已配置' : '❌ 未配置',
-            PADDLE_WEBHOOK_SECRET: process.env.PADDLE_WEBHOOK_SECRET ? `✅ 已配置（长度: ${process.env.PADDLE_WEBHOOK_SECRET.length} 字符）` : '❌ 未配置（⭐ 必做！防止伪造 Webhook 请求）',
-            PADDLE_CLIENT_TOKEN: process.env.PADDLE_CLIENT_TOKEN ? '✅ 已配置' : '❌ 未配置'
+            PADDLE_WEBHOOK_SECRET: process.env.PADDLE_WEBHOOK_SECRET ? `✅ 已配置（长度: ${process.env.PADDLE_WEBHOOK_SECRET.length} 字符，Webhook 签名校验已启用）` : '❌ 未配置（⭐ 必做！防止伪造 Webhook 请求）',
+            PADDLE_CLIENT_TOKEN: process.env.PADDLE_CLIENT_TOKEN ? '✅ 已配置' : '❌ 未配置',
+            ADMIN_PAGE_KEY: process.env.ADMIN_PAGE_KEY ? `✅ 已配置（访问 /?admin_key=xxx 可打开管理员内测表单，长度: ${process.env.ADMIN_PAGE_KEY.length}）` : '❌ 未配置（普通访客 / 直接 302 跳 /order，建议配置以支持管理员内测）',
+            ADMIN_GENERATE_KEY: process.env.ADMIN_GENERATE_KEY ? `✅ 已配置（POST / 时传 admin_secret=xxx 可免费生成，长度: ${process.env.ADMIN_GENERATE_KEY.length}）` : '❌ 未配置（未授权 POST / 将返回 403，请配置以支持管理员手动调 API）'
           }
         }, null, 2));
         return;
@@ -720,15 +758,28 @@ if (require.main === module) {
         }
         return;
       }
-      // 首页
-      if (req.url === '/' || req.url === '/index.html') {
+      // 首页：普通访客 302 跳转到付费订单页；仅管理员携带 ?admin_key=ADMIN_PAGE_KEY 时才返回原免费表单（方便内部测试）
+      if (req.url === '/' || req.url.startsWith('/?') || req.url === '/index.html') {
         try {
-          const html = fs.readFileSync(FRONTEND_PATH, 'utf-8');
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          res.end(html);
+          const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+          const adminKey = urlObj.searchParams.get('admin_key');
+          const requireAdminKey = process.env.ADMIN_PAGE_KEY && process.env.ADMIN_PAGE_KEY.length > 0;
+
+          const isAdmin = requireAdminKey && adminKey && adminKey === process.env.ADMIN_PAGE_KEY;
+
+          if (isAdmin) {
+            // 管理员：返回旧免费表单
+            const html = fs.readFileSync(FRONTEND_PATH, 'utf-8');
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(html);
+          } else {
+            // 普通访客：强制 302 跳 /order，避免未付费直接生成
+            res.writeHead(302, { Location: '/order' });
+            res.end();
+          }
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-          res.end(`前端页面读取失败: ${err.message}`);
+          res.end(`首页处理失败: ${err.message}`);
         }
         return;
       }
@@ -738,12 +789,67 @@ if (require.main === module) {
       return;
     }
 
+    // POST /request-generate-token — 仅在支付成功页面发放临时一次性生成令牌（3分钟有效）
+    if (req.method === 'POST' && req.url === '/request-generate-token') {
+      try {
+        // 随机 32 字节 token
+        const token = crypto.randomBytes(24).toString('hex');
+        tempTokens.set(token, { expireAt: Date.now() + TEMP_TOKEN_TTL_MS, used: false });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS });
+        res.end(JSON.stringify({ ok: true, token, ttl_seconds: Math.floor(TEMP_TOKEN_TTL_MS / 1000) }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Failed to issue generate token: ' + err.message }));
+      }
+      return;
+    }
+
     // POST /webhook — Paddle 支付通知（交易完成时自动触发）
     if (req.method === 'POST' && req.url === '/webhook') {
       let chunks = '';
       req.on('data', c => chunks += c);
       req.on('end', async () => {
         try {
+          // 🔒 Paddle Webhook 签名校验（Paddle-Signature: ts=xxx;h1=xxx）
+          const sigHeader = (req.headers['paddle-signature'] || req.headers['Paddle-Signature'] || '');
+          const webhookSecret = process.env.PADDLE_WEBHOOK_SECRET || '';
+          if (webhookSecret && webhookSecret.length > 0 && sigHeader.length > 0) {
+            const tsMatch = sigHeader.match(/ts=([^;]+)/);
+            const h1Match = sigHeader.match(/h1=([a-fA-F0-9]+)/);
+            if (!tsMatch || !h1Match) {
+              console.warn('[WEBHOOK] 签名格式不合法，丢弃请求');
+              res.writeHead(403, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ received: false, error: 'invalid signature format' }));
+              return;
+            }
+            const [, tsStr] = tsMatch;
+            const [, claimedH1] = h1Match;
+            const payloadToSign = `${tsStr}:${chunks}`;
+            const expectedH1 = crypto
+              .createHmac('sha256', webhookSecret)
+              .update(payloadToSign, 'utf8')
+              .digest('hex');
+            // 防止时序攻击，用 timingSafeEqual
+            const a = Buffer.from(expectedH1, 'hex');
+            const b = Buffer.from(claimedH1, 'hex');
+            const sigOk = a.length === b.length && crypto.timingSafeEqual(a, b);
+            // 可选：ts 时间戳和本地差超过 5 分钟拒绝（防止重放）
+            const tsMs = Number(tsStr) * 1000;
+            const freshOk = Number.isFinite(tsMs) && Math.abs(Date.now() - tsMs) < 5 * 60 * 1000;
+            if (!sigOk || !freshOk) {
+              console.warn(`[WEBHOOK] 签名验证失败，丢弃请求。sigOk=${sigOk} freshOk=${freshOk}`);
+              res.writeHead(403, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ received: false, error: 'signature mismatch or replay' }));
+              return;
+            }
+            console.log('[WEBHOOK] ✅ Paddle 签名验证通过');
+          } else if (webhookSecret && webhookSecret.length > 0) {
+            console.warn('[WEBHOOK] 已配置 PADDLE_WEBHOOK_SECRET，但请求未带 Paddle-Signature 头。拒绝。');
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ received: false, error: 'missing paddle-signature header' }));
+            return;
+          }
+
           const event = JSON.parse(chunks);
           const eventType = event.event_type;
           console.log(`[WEBHOOK] 收到事件: ${eventType}`);

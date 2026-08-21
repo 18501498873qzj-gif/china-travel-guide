@@ -588,11 +588,18 @@ if (new URLSearchParams(window.location.search).get('success') === 'true') {
     };
 
     // Fire API call in background (fire-and-forget for email delivery)
-    fetch('/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ preferences, format: 'doc' })
-    })
+    // Step 1: 先向服务端申请一个 3 分钟一次性 generate_token（未付费用户无法直接拿 token，彻底堵住 API 漏洞）
+    fetch('/request-generate-token', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed to obtain generate token')))
+      .then(({ token }) => {
+        if (!token) return Promise.reject(new Error('Empty generate token'));
+        // Step 2: 带合法一次性 token 调用 POST / 生成攻略
+        return fetch('/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ preferences, format: 'doc', generate_token: token })
+        });
+      })
     .then(res => res.json().then(data => ({ ok: res.ok, data })))
     .then(({ ok, data }) => {
       if (!ok) throw new Error(data.error || 'Generation failed');
