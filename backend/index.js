@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const https = require('https');
 let nodemailer = null;
 try { nodemailer = require('nodemailer'); } catch (e) { /* nodemailer 可选，没装也不影响核心功能 */ }
 
@@ -76,56 +77,124 @@ async function getTransporter() {
   return null;
 }
 
+// ---------- 邮件发送（支持 Resend API + SMTP 双模式） ----------
 async function sendGuideEmail(to, fileName, docBuffer, preferences) {
+  const cities = Array.isArray(preferences.cities) ? preferences.cities.join(' · ') : String(preferences.cities);
+  const { emailSubject: localizedSubject } = buildLocalizedFileInfo(preferences);
+  const defaultSubject = `Your ${preferences.days}-Day ${cities} China Travel Guide is ready 🧭`;
+  const subject = localizedSubject || defaultSubject;
+  const isZh = !!(preferences.language && String(preferences.language).includes('中文'));
+  const cfg = getSmtpConfig();
+  const fromEmail = cfg ? cfg.from : process.env.SMTP_FROM || 'guide@china-travel-guide.com';
+
+  const emailHtml = `
+    <div style="font-family:-apple-system,'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;background:#faf6f0;padding:24px;border-radius:12px;color:#2c3e50;">
+      <div style="background:linear-gradient(135deg,#c0392b,#922b21);color:white;padding:20px 24px;border-radius:10px;text-align:center;">
+        <h2 style="margin:0;">${isZh ? '🧭 您的旅行攻略已生成' : '🧭 Your travel guide is ready'}</h2>
+        <p style="margin:8px 0 0;opacity:0.92;font-size:14px;">祝您旅途愉快！Have a wonderful trip!</p>
+      </div>
+      <div style="padding:20px 24px;background:white;border-radius:10px;margin-top:16px;">
+        <h3 style="margin:0 0 12px;color:#c0392b;">📋 ${isZh ? '行程概览' : 'Trip Overview'}</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr><td style="padding:6px 0;color:#7f8c8d;width:40%;">${isZh ? '目的地' : 'Destinations'}</td><td style="padding:6px 0;"><b>${cities}</b></td></tr>
+          <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '行程天数' : 'Days'}</td><td style="padding:6px 0;"><b>${preferences.days} ${isZh ? '天' : 'days'}</b></td></tr>
+          <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '人数' : 'Travelers'}</td><td style="padding:6px 0;">${preferences.travelers || '-'}</td></tr>
+          <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '出发日期' : 'Arrival'}</td><td style="padding:6px 0;">${preferences.arrivalDate || '-'}</td></tr>
+          <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '攻略语言' : 'Language'}</td><td style="padding:6px 0;">${preferences.language || '-'}</td></tr>
+          <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '住宿偏好' : 'Hotel'}</td><td style="padding:6px 0;">${preferences.hotelPref || '-'}</td></tr>
+          <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '交通偏好' : 'Transport'}</td><td style="padding:6px 0;">${preferences.transportPref || '-'}</td></tr>
+          <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '预算等级' : 'Budget'}</td><td style="padding:6px 0;">${preferences.budget || '-'}</td></tr>
+          ${preferences.interests?.length ? `<tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '兴趣方向' : 'Interests'}</td><td style="padding:6px 0;">${Array.isArray(preferences.interests) ? preferences.interests.join('、') : preferences.interests}</td></tr>` : ''}
+        </table>
+        <p style="margin-top:20px;padding:12px 14px;background:#fff6e5;border-radius:8px;font-size:13px;color:#926b21;">
+          📎 ${isZh ? '攻略文档（.doc）在附件中，可直接用 Word / WPS / Google Docs 打开。' : 'Your guide (.doc) is attached — open with Word / WPS / Google Docs.'}
+        </p>
+      </div>
+      <div style="text-align:center;font-size:12px;color:#7f8c8d;margin-top:16px;">
+        ${isZh ? '由 China Travel Guide Generator 自动发送' : 'Auto-sent by China Travel Guide Generator'}
+      </div>
+    </div>
+  `;
+
+  // 优先使用 Resend API（HTTP 方式，不受 SMTP 端口限制）
+  const resendKey = process.env.RESEND_API_KEY;
+  if (resendKey) {
+    try {
+      const boundary = '----ResendBoundary' + Date.now();
+      const fileBase64 = docBuffer.toString('base64');
+      const attachmentsPart = `--${boundary}\r\nContent-Disposition: attachment; filename="${fileName}"\r\nContent-Type: application/msword\r\nContent-Transfer-Encoding: base64\r\n\r\n${fileBase64}\r\n`;
+      
+      const body = JSON.stringify({
+        from: fromEmail,
+        to: [to],
+        subject,
+        html: emailHtml,
+        attachments: [{
+          filename: fileName,
+          content: fileBase64,
+          type: 'application/msword'
+        }]
+      });
+
+      const reqOptions = {
+        hostname: 'api.resend.com',
+        path: '/emails',
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendKey}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        },
+        timeout: 15000
+      };
+
+      const emailResult = await new Promise((resolve, reject) => {
+        const req = https.request(reqOptions, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(data);
+              if (res.statusCode >= 200 && res.statusCode < 300) {
+                resolve({ ok: true, provider: 'resend', id: parsed.id, messageId: parsed.id });
+              } else {
+                reject(new Error(`Resend API error (${res.statusCode}): ${JSON.stringify(parsed)}`));
+              }
+            } catch (e) {
+              reject(new Error(`Resend response parse error: ${data}`));
+            }
+          });
+        });
+        req.on('error', reject);
+        req.on('timeout', () => req.destroy(new Error('Resend API timeout (15s)')));
+        req.write(body);
+        req.end();
+      });
+
+      console.log(`[EMAIL] Resend 发送成功: ${to}`);
+      return { ok: true, provider: 'resend', info: emailResult.id };
+    } catch (err) {
+      console.warn(`[EMAIL] Resend 发送失败，降级到 SMTP: ${err.message}`);
+    }
+  }
+
+  // 降级：使用 SMTP
   try {
-    const transporter = await getTransporter();
-    const cfg = getSmtpConfig();
     if (!cfg) {
       return { ok: false, reason: 'SMTP 未配置（缺少 SMTP_USER / SMTP_PASS）' };
     }
     if (!nodemailer) {
-      return { ok: false, reason: 'nodemailer 未加载（npm install 可能失败，请检查 Render 构建日志）' };
+      return { ok: false, reason: 'nodemailer 未加载（npm install 可能失败）' };
     }
+    const transporter = await getTransporter();
     if (!transporter) {
-      return { ok: false, reason: 'SMTP transporter 创建失败，请检查 SMTP_HOST/PORT/SECURE 配置' };
+      return { ok: false, reason: 'SMTP 连接超时或被阻断，建议配置 RESEND_API_KEY 使用 HTTP API 发送' };
     }
-    const cities = Array.isArray(preferences.cities) ? preferences.cities.join(' · ') : String(preferences.cities);
-    const { emailSubject: localizedSubject } = buildLocalizedFileInfo(preferences);
-    const defaultSubject = `Your ${preferences.days}-Day ${cities} China Travel Guide is ready 🧭`;
-    const subject = localizedSubject || defaultSubject;
-    const isZh = !!(preferences.language && String(preferences.language).includes('中文'));
     const mail = {
       from: `"China Travel Guide" <${cfg.from}>`,
       to,
       subject,
-      html: `
-        <div style="font-family:-apple-system,'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;background:#faf6f0;padding:24px;border-radius:12px;color:#2c3e50;">
-          <div style="background:linear-gradient(135deg,#c0392b,#922b21);color:white;padding:20px 24px;border-radius:10px;text-align:center;">
-            <h2 style="margin:0;">${isZh ? '🧭 您的旅行攻略已生成' : '🧭 Your travel guide is ready'}</h2>
-            <p style="margin:8px 0 0;opacity:0.92;font-size:14px;">祝您旅途愉快！Have a wonderful trip!</p>
-          </div>
-          <div style="padding:20px 24px;background:white;border-radius:10px;margin-top:16px;">
-            <h3 style="margin:0 0 12px;color:#c0392b;">📋 ${isZh ? '行程概览' : 'Trip Overview'}</h3>
-            <table style="width:100%;border-collapse:collapse;font-size:14px;">
-              <tr><td style="padding:6px 0;color:#7f8c8d;width:40%;">${isZh ? '目的地' : 'Destinations'}</td><td style="padding:6px 0;"><b>${cities}</b></td></tr>
-              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '行程天数' : 'Days'}</td><td style="padding:6px 0;"><b>${preferences.days} ${isZh ? '天' : 'days'}</b></td></tr>
-              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '人数' : 'Travelers'}</td><td style="padding:6px 0;">${preferences.travelers || '-'}</td></tr>
-              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '出发日期' : 'Arrival'}</td><td style="padding:6px 0;">${preferences.arrivalDate || '-'}</td></tr>
-              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '攻略语言' : 'Language'}</td><td style="padding:6px 0;">${preferences.language || '-'}</td></tr>
-              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '住宿偏好' : 'Hotel'}</td><td style="padding:6px 0;">${preferences.hotelPref || '-'}</td></tr>
-              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '交通偏好' : 'Transport'}</td><td style="padding:6px 0;">${preferences.transportPref || '-'}</td></tr>
-              <tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '预算等级' : 'Budget'}</td><td style="padding:6px 0;">${preferences.budget || '-'}</td></tr>
-              ${preferences.interests?.length ? `<tr><td style="padding:6px 0;color:#7f8c8d;">${isZh ? '兴趣方向' : 'Interests'}</td><td style="padding:6px 0;">${Array.isArray(preferences.interests) ? preferences.interests.join('、') : preferences.interests}</td></tr>` : ''}
-            </table>
-            <p style="margin-top:20px;padding:12px 14px;background:#fff6e5;border-radius:8px;font-size:13px;color:#926b21;">
-              📎 ${isZh ? '攻略文档（.doc）在附件中，可直接用 Word / WPS / Google Docs 打开。' : 'Your guide (.doc) is attached — open with Word / WPS / Google Docs.'}
-            </p>
-          </div>
-          <div style="text-align:center;font-size:12px;color:#7f8c8d;margin-top:16px;">
-            ${isZh ? '由 China Travel Guide Generator 自动发送 · Render 免费云部署' : 'Auto-sent by China Travel Guide Generator · Render free cloud deploy'}
-          </div>
-        </div>
-      `,
+      html: emailHtml,
       attachments: [{
         filename: fileName,
         content: docBuffer,
@@ -133,20 +202,14 @@ async function sendGuideEmail(to, fileName, docBuffer, preferences) {
       }]
     };
     const info = await transporter.sendMail(mail);
-    console.log(`[EMAIL] 发送成功: ${to} -> ${info.messageId || 'ok'}`);
-    return { ok: true, info: info.messageId };
+    console.log(`[EMAIL] SMTP 发送成功: ${to}`);
+    return { ok: true, provider: 'smtp', info: info.messageId };
   } catch (err) {
     console.error(`[EMAIL] 发送失败 (${to}):`, err.message);
-    console.error('[EMAIL] 错误详情:', { code: err.code, command: err.command, response: err.response, responseCode: err.responseCode });
     return {
       ok: false,
       reason: err.message,
-      details: {
-        code: err.code,
-        command: err.command,
-        smtpResponse: err.response,
-        smtpResponseCode: err.responseCode
-      }
+      suggestion: '建议配置 RESEND_API_KEY 使用 HTTP API 发送，避免 SMTP 端口被阻断'
     };
   }
 }
@@ -341,35 +404,33 @@ if (require.main === module) {
 
       // GET 路由
     if (req.method === 'GET') {
-      // Health check + SMTP 诊断
+      // Health check + SMTP/Resend 诊断
       if (req.url === '/health' || req.url === '/healthz' || req.url === '/diagnose') {
         const cfg = getSmtpConfig();
         const hasNodemailer = !!nodemailer;
         const hasUser = !!process.env.SMTP_USER;
         const hasPass = !!process.env.SMTP_PASS;
+        const hasResendKey = !!process.env.RESEND_API_KEY;
         let smtpStatus;
         if (!hasNodemailer) {
-          smtpStatus = { ok: false, reason: 'nodemailer 未加载！npm install 可能失败或未执行，请检查 Render 构建日志', level: 'error' };
+          smtpStatus = { ok: false, reason: 'nodemailer 未加载', level: 'error' };
         } else if (!cfg) {
-          smtpStatus = { ok: false, reason: `SMTP 变量缺失：SMTP_USER=${hasUser ? '✅' : '❌'}, SMTP_PASS=${hasPass ? '✅' : '❌'}`, level: 'error' };
+          smtpStatus = { ok: false, reason: `SMTP 变量缺失`, level: 'error' };
         } else {
-          smtpStatus = {
-            ok: true,
-            host: cfg.host,
-            port: cfg.port,
-            user: cfg.user,
-            from: cfg.from,
-            nodemailer: true,
-            level: 'ok'
-          };
+          smtpStatus = { ok: true, host: cfg.host, port: cfg.port, user: cfg.user, from: cfg.from, nodemailer: true, level: 'ok' };
         }
+        const emailStatus = hasResendKey
+          ? { ok: true, provider: 'Resend (HTTP API)', level: 'ok', note: '推荐！不受 SMTP 端口限制' }
+          : (smtpStatus.ok ? { ok: true, provider: 'SMTP', level: 'ok', note: '可能存在端口被阻断风险' } : { ok: false, provider: '未配置', level: 'error', note: '建议配置 RESEND_API_KEY' });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({
           status: 'ok',
           uptime: process.uptime(),
           smtp: smtpStatus,
+          email: emailStatus,
           env: {
             NODE_ENV: process.env.NODE_ENV || 'development',
+            RESEND_API_KEY: hasResendKey ? '✅ 已配置' : '❌ 未配置（建议配置）',
             DEEPSEEK_KEY: process.env.DEEPSEEK_API_KEY ? '✅ 已配置' : '❌ 未配置',
             FEISHU_APP_ID: process.env.FEISHU_APP_ID ? '✅ 已配置' : '❌ 未配置',
             FEISHU_APP_SECRET: process.env.FEISHU_APP_SECRET ? '✅ 已配置' : '❌ 未配置',
