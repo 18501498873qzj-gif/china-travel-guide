@@ -241,9 +241,33 @@ textarea { resize: vertical; min-height: 60px; }
 <!-- Paddle SDK -->
 <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 <script>
-// Initialize Paddle
-Paddle.Environment.set('live');
-Paddle.Initialize({ token: 'live_8de9d646e470503d57b4c3cdc60' });
+let paddleAvailable = false;
+try {
+  if (typeof Paddle !== 'undefined') {
+    Paddle.Environment.set('live');
+    Paddle.Initialize({ token: 'live_8de9d646e470503d57b4c3cdc60' });
+    paddleAvailable = true;
+  }
+} catch(e) { paddleAvailable = false; }
+
+// If Paddle SDK fails to load (e.g. China DNS blocks cdn.paddle.com),
+// show fallback payment option after 3 seconds
+setTimeout(() => {
+  if (!paddleAvailable) {
+    const buyBtn = document.getElementById('buyBtn');
+    buyBtn.style.display = 'none';
+    const fallback = document.createElement('div');
+    fallback.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:1rem;margin-top:1rem;text-align:center;';
+    fallback.innerHTML = `
+      <p style="font-weight:700;color:#856404;">⚠️ Online payment is not available in your region</p>
+      <p style="font-size:0.85rem;color:#856404;margin:0.5rem 0;">Paddle checkout is blocked in some regions. You can still purchase by:</p>
+      <p style="font-size:0.85rem;margin:0.3rem 0;">1. Email your order to <a href="mailto:18501498873qzj@gmail.com">18501498873qzj@gmail.com</a> — we'll process manually</p>
+      <p style="font-size:0.85rem;margin:0.3rem 0;">2. Or <a href="/pricing" style="color:#c0392b;font-weight:600;">try again with VPN/proxy</a></p>
+      <p style="font-size:0.8rem;color:#aaa;margin-top:0.5rem;">Normal overseas users can pay directly via the Buy Now button above.</p>
+    `;
+    buyBtn.parentNode.insertBefore(fallback, buyBtn.nextSibling);
+  }
+}, 3000);
 
 // Chip multi-select
 document.querySelectorAll('#interests .chip').forEach(chip => {
@@ -306,6 +330,12 @@ document.getElementById('buyBtn').addEventListener('click', () => {
     return;
   }
   document.getElementById('formError').textContent = '';
+
+  // Check if Paddle is available
+  if (!paddleAvailable || typeof Paddle === 'undefined') {
+    document.getElementById('formError').textContent = 'Online payment is not available. Please email 18501498873qzj@gmail.com to place your order manually.';
+    return;
+  }
 
   // Save form data to sessionStorage for retrieval after redirect
   sessionStorage.setItem('orderFormData', JSON.stringify(data));
