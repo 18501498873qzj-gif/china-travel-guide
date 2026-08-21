@@ -127,7 +127,74 @@ async function sendGuideEmail(to, fileName, docBuffer, preferences) {
     </div>
   `;
 
-  // 🥇 优先使用 SendGrid API（HTTP 方式，支持单邮箱验证 → 无需域名即可发给任意用户）
+  // 🥇 优先使用 Brevo (Sendinblue) API — 免费 300 封/天，支持单邮箱验证无需域名
+  const brevoKey = process.env.BREVO_API_KEY;
+  if (brevoKey) {
+    try {
+      const fileBase64 = docBuffer.toString('base64');
+      const brevoFrom = parseFromAddress(process.env.BREVO_FROM || '"China Travel Guide" <18501498873qzj@gmail.com>');
+      const sender = { email: brevoFrom.email };
+      if (brevoFrom.name) sender.name = brevoFrom.name;
+      const body = JSON.stringify({
+        sender: sender,
+        to: [{ email: to }],
+        subject: subject,
+        htmlContent: emailHtml,
+        attachment: [{
+          name: fileName,
+          content: fileBase64
+        }]
+      });
+
+      const reqOptions = {
+        hostname: 'api.brevo.com',
+        path: '/v3/smtp/email',
+        method: 'POST',
+        headers: {
+          'api-key': brevoKey,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        },
+        timeout: 20000
+      };
+
+      const emailResult = await new Promise((resolve, reject) => {
+        const req = https.request(reqOptions, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try {
+              const parsed = data ? JSON.parse(data) : {};
+              if (res.statusCode >= 200 && res.statusCode < 300) {
+                resolve({ ok: true, provider: 'brevo', messageId: parsed.messageId });
+              } else {
+                reject(new Error(`Brevo API error (${res.statusCode}): ${JSON.stringify(parsed)}`));
+              }
+            } catch (e) {
+              reject(new Error(`Brevo response parse error (${res.statusCode}): ${data}`));
+            }
+          });
+        });
+        req.on('error', reject);
+        req.on('timeout', () => req.destroy(new Error('Brevo API timeout (20s)')));
+        req.write(body);
+        req.end();
+      });
+
+      console.log(`[EMAIL] Brevo 发送成功: ${to}`);
+      return { ok: true, provider: 'brevo', info: emailResult.messageId };
+    } catch (err) {
+      console.warn(`[EMAIL] Brevo 发送失败: ${err.message}`);
+      return {
+        ok: false,
+        provider: 'brevo',
+        reason: `Brevo 发送失败: ${err.message}`,
+        suggestion: '检查 BREVO_API_KEY 是否正确，或 18501498873qzj@gmail.com 是否已在 Brevo 做 Senders 验证'
+      };
+    }
+  }
+
+  // 🥈 使用 SendGrid API（HTTP 方式，支持单邮箱验证 → 无需域名即可发给任意用户）
   const sendgridKey = process.env.SENDGRID_API_KEY;
   if (sendgridKey) {
     try {
@@ -497,6 +564,7 @@ if (require.main === module) {
         const hasPass = !!process.env.SMTP_PASS;
         const hasResendKey = !!process.env.RESEND_API_KEY;
         const hasSendgridKey = !!process.env.SENDGRID_API_KEY;
+        const hasBrevoKey = !!process.env.BREVO_API_KEY;
         let smtpStatus;
         if (!hasNodemailer) {
           smtpStatus = { ok: false, reason: 'nodemailer 未加载', level: 'error' };
@@ -506,14 +574,16 @@ if (require.main === module) {
           smtpStatus = { ok: true, host: cfg.host, port: cfg.port, user: cfg.user, from: cfg.from, nodemailer: true, level: 'ok' };
         }
         let emailStatus;
-        if (hasSendgridKey) {
-          emailStatus = { ok: true, provider: 'SendGrid (HTTP API)', from: process.env.SENDGRID_FROM || '"China Travel Guide" <18501498873qzj@gmail.com>', level: 'ok', note: '✅ 最佳！无需域名，单邮箱验证即可发给任意用户' };
+        if (hasBrevoKey) {
+          emailStatus = { ok: true, provider: 'Brevo (Sendinblue) HTTP API', from: process.env.BREVO_FROM || '"China Travel Guide" <18501498873qzj@gmail.com>', level: 'ok', note: '✅ 最佳！免费300封/天，无需域名，单邮箱验证即可发给任意用户' };
+        } else if (hasSendgridKey) {
+          emailStatus = { ok: true, provider: 'SendGrid (HTTP API)', from: process.env.SENDGRID_FROM || '"China Travel Guide" <18501498873qzj@gmail.com>', level: 'ok', note: '无需域名，单邮箱验证即可发给任意用户' };
         } else if (hasResendKey) {
           emailStatus = { ok: true, provider: 'Resend (HTTP API)', from: process.env.RESEND_FROM || 'onboarding@resend.dev', level: 'ok', note: '需验证域名才能发任意邮箱' };
         } else if (smtpStatus.ok) {
           emailStatus = { ok: true, provider: 'SMTP', level: 'ok', note: '可能存在端口被阻断风险' };
         } else {
-          emailStatus = { ok: false, provider: '未配置', level: 'error', note: '建议配置 SENDGRID_API_KEY（无需域名）' };
+          emailStatus = { ok: false, provider: '未配置', level: 'error', note: '建议配置 BREVO_API_KEY（免费300封/天，无需域名）' };
         }
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({
@@ -523,7 +593,9 @@ if (require.main === module) {
           email: emailStatus,
           env: {
             NODE_ENV: process.env.NODE_ENV || 'development',
-            SENDGRID_API_KEY: hasSendgridKey ? '✅ 已配置' : '❌ 未配置（推荐！无需域名）',
+            BREVO_API_KEY: hasBrevoKey ? '✅ 已配置' : '❌ 未配置（⭐ 推荐！免费300封/天，无需域名）',
+            BREVO_FROM: process.env.BREVO_FROM ? process.env.BREVO_FROM : '"China Travel Guide" <18501498873qzj@gmail.com>（默认）',
+            SENDGRID_API_KEY: hasSendgridKey ? '✅ 已配置' : '❌ 未配置',
             SENDGRID_FROM: process.env.SENDGRID_FROM ? process.env.SENDGRID_FROM : '"China Travel Guide" <18501498873qzj@gmail.com>（默认）',
             RESEND_API_KEY: hasResendKey ? '✅ 已配置' : '❌ 未配置',
             RESEND_FROM: process.env.RESEND_FROM ? process.env.RESEND_FROM : 'onboarding@resend.dev（默认）',
