@@ -85,7 +85,7 @@ async function sendGuideEmail(to, fileName, docBuffer, preferences) {
   const subject = localizedSubject || defaultSubject;
   const isZh = !!(preferences.language && String(preferences.language).includes('中文'));
   const cfg = getSmtpConfig();
-  const fromEmail = cfg ? cfg.from : process.env.SMTP_FROM || 'guide@china-travel-guide.com';
+  const fromEmail = process.env.RESEND_FROM || (cfg ? cfg.from : process.env.SMTP_FROM || 'onboarding@resend.dev');
 
   const emailHtml = `
     <div style="font-family:-apple-system,'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;background:#faf6f0;padding:24px;border-radius:12px;color:#2c3e50;">
@@ -420,7 +420,7 @@ if (require.main === module) {
           smtpStatus = { ok: true, host: cfg.host, port: cfg.port, user: cfg.user, from: cfg.from, nodemailer: true, level: 'ok' };
         }
         const emailStatus = hasResendKey
-          ? { ok: true, provider: 'Resend (HTTP API)', level: 'ok', note: '推荐！不受 SMTP 端口限制' }
+          ? { ok: true, provider: 'Resend (HTTP API)', from: process.env.RESEND_FROM || 'onboarding@resend.dev', level: 'ok', note: '推荐！不受 SMTP 端口限制' }
           : (smtpStatus.ok ? { ok: true, provider: 'SMTP', level: 'ok', note: '可能存在端口被阻断风险' } : { ok: false, provider: '未配置', level: 'error', note: '建议配置 RESEND_API_KEY' });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({
@@ -431,6 +431,7 @@ if (require.main === module) {
           env: {
             NODE_ENV: process.env.NODE_ENV || 'development',
             RESEND_API_KEY: hasResendKey ? '✅ 已配置' : '❌ 未配置（建议配置）',
+            RESEND_FROM: process.env.RESEND_FROM ? process.env.RESEND_FROM : 'onboarding@resend.dev（默认）',
             DEEPSEEK_KEY: process.env.DEEPSEEK_API_KEY ? '✅ 已配置' : '❌ 未配置',
             FEISHU_APP_ID: process.env.FEISHU_APP_ID ? '✅ 已配置' : '❌ 未配置',
             FEISHU_APP_SECRET: process.env.FEISHU_APP_SECRET ? '✅ 已配置' : '❌ 未配置',
