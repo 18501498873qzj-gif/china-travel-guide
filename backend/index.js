@@ -54,8 +54,14 @@ async function sendGuideEmail(to, fileName, docBuffer, preferences) {
   try {
     const transporter = getTransporter();
     const cfg = getSmtpConfig();
-    if (!transporter || !cfg) {
+    if (!cfg) {
       return { ok: false, reason: 'SMTP 未配置（缺少 SMTP_USER / SMTP_PASS）' };
+    }
+    if (!nodemailer) {
+      return { ok: false, reason: 'nodemailer 未加载（npm install 可能失败，请检查 Render 构建日志）' };
+    }
+    if (!transporter) {
+      return { ok: false, reason: 'SMTP transporter 创建失败，请检查 SMTP_HOST/PORT/SECURE 配置' };
     }
     const cities = Array.isArray(preferences.cities) ? preferences.cities.join(' · ') : String(preferences.cities);
     const { emailSubject: localizedSubject } = buildLocalizedFileInfo(preferences);
@@ -302,9 +308,25 @@ if (require.main === module) {
       // Health check + SMTP 诊断
       if (req.url === '/health' || req.url === '/healthz' || req.url === '/diagnose') {
         const cfg = getSmtpConfig();
-        const smtpStatus = cfg
-          ? { ok: true, host: cfg.host, port: cfg.port, user: cfg.user, from: cfg.from, nodemailer: !!nodemailer }
-          : { ok: false, reason: 'SMTP 未配置，缺少 SMTP_USER / SMTP_PASS 环境变量', nodemailer: !!nodemailer };
+        const hasNodemailer = !!nodemailer;
+        const hasUser = !!process.env.SMTP_USER;
+        const hasPass = !!process.env.SMTP_PASS;
+        let smtpStatus;
+        if (!hasNodemailer) {
+          smtpStatus = { ok: false, reason: 'nodemailer 未加载！npm install 可能失败或未执行，请检查 Render 构建日志', level: 'error' };
+        } else if (!cfg) {
+          smtpStatus = { ok: false, reason: `SMTP 变量缺失：SMTP_USER=${hasUser ? '✅' : '❌'}, SMTP_PASS=${hasPass ? '✅' : '❌'}`, level: 'error' };
+        } else {
+          smtpStatus = {
+            ok: true,
+            host: cfg.host,
+            port: cfg.port,
+            user: cfg.user,
+            from: cfg.from,
+            nodemailer: true,
+            level: 'ok'
+          };
+        }
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({
           status: 'ok',
@@ -312,11 +334,11 @@ if (require.main === module) {
           smtp: smtpStatus,
           env: {
             NODE_ENV: process.env.NODE_ENV || 'development',
-            DEEPSEEK_KEY: process.env.DEEPSEEK_API_KEY ? '已配置' : '未配置',
-            FEISHU_APP_ID: process.env.FEISHU_APP_ID ? '已配置' : '未配置',
-            FEISHU_APP_SECRET: process.env.FEISHU_APP_SECRET ? '已配置' : '未配置',
-            FEISHU_APP_TOKEN: process.env.FEISHU_APP_TOKEN ? '已配置' : '未配置',
-            FEISHU_TABLE_ID: process.env.FEISHU_TABLE_ID ? '已配置' : '未配置'
+            DEEPSEEK_KEY: process.env.DEEPSEEK_API_KEY ? '✅ 已配置' : '❌ 未配置',
+            FEISHU_APP_ID: process.env.FEISHU_APP_ID ? '✅ 已配置' : '❌ 未配置',
+            FEISHU_APP_SECRET: process.env.FEISHU_APP_SECRET ? '✅ 已配置' : '❌ 未配置',
+            FEISHU_APP_TOKEN: process.env.FEISHU_APP_TOKEN ? '✅ 已配置' : '❌ 未配置',
+            FEISHU_TABLE_ID: process.env.FEISHU_TABLE_ID ? '✅ 已配置' : '❌ 未配置'
           }
         }, null, 2));
         return;

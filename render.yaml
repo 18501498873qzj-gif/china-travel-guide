@@ -1,13 +1,20 @@
-# Build
-buildCommand = "cd backend && npm install && cp frontend/index.html backend/ && echo 'build done'"
+# Render 部署配置
+# Build: 在根目录和 backend 目录都安装依赖，并把前端 index.html 复制到 backend
+buildCommand = "npm install && cd backend && npm install && cp ../frontend/index.html ./index.html && echo '✅ Build done'"
 
-# Run
+# Run: 启动后端服务
 startCommand = "cd backend && node index.js"
 
-# Listen port (matches index.js PORT 3000)
-[services]
+# Listen port
 port = 3000
 
-[[services.env]]
-key = "NODE_ENV"
-value = "production"
+# 环境变量（也可以在 Render Dashboard Environment 页面配置）
+env:
+  - key: NODE_ENV
+    value: production
+  - key: SMTP_HOST
+    value: smtp.gmail.com
+  - key: SMTP_PORT
+    value: "587"
+  - key: SMTP_SECURE
+    value: "false"
