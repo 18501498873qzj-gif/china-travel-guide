@@ -298,6 +298,12 @@ if (require.main === module) {
 
       // GET 路由
     if (req.method === 'GET') {
+      // Health check
+      if (req.url === '/health' || req.url === '/healthz') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+        return;
+      }
       // Paddle SDK 本地托管（避免 CDN 在国内被 DNS 污染）
       if (req.url === '/paddle.js' || req.url === '/v2/paddle.js') {
         try {
