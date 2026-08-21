@@ -313,6 +313,10 @@ document.getElementById('buyBtn').addEventListener('click', () => {
   // Open Paddle checkout
   Paddle.Checkout.open({
     items: [{ priceId: 'pri_01m0h0hs1axtqq0fzssmk99qm1', quantity: 1 }],
+    customData: {
+      email: data.email,
+      preferences: JSON.stringify(data)
+    },
     customer: { email: data.email },
     settings: {
       successUrl: window.location.origin + '/order?success=true',

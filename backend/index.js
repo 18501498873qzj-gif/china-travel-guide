@@ -372,6 +372,63 @@ if (require.main === module) {
       }
     }
 
+    // POST /webhook — Paddle 支付通知（交易完成时自动触发）
+    if (req.method === 'POST' && req.url === '/webhook') {
+      let chunks = '';
+      req.on('data', c => chunks += c);
+      req.on('end', async () => {
+        try {
+          const event = JSON.parse(chunks);
+          const eventType = event.event_type;
+          console.log(`[WEBHOOK] 收到事件: ${eventType}`);
+          if (eventType === 'transaction.completed') {
+            const transaction = event.data || {};
+            const customData = transaction.custom_data || {};
+            const email = customData.email || (transaction.customer && transaction.customer.email);
+            let preferences = null;
+            if (customData.preferences) {
+              try { preferences = JSON.parse(customData.preferences); } catch(e) { preferences = null; }
+            }
+            if (email && preferences) {
+              console.log(`[WEBHOOK] 开始为 ${email} 生成攻略`);
+              
+              const { fetchKnowledgeBase } = require('./feishu');
+              const { generateGuide } = require('./deepseek');
+              const { generateDoc } = require('./docgen');
+              const { SYSTEM_PROMPT, buildUserPrompt } = require('./prompt');
+              let knowledgeBase = [];
+              try {
+                knowledgeBase = await fetchKnowledgeBase({
+                  appId: process.env.FEISHU_APP_ID,
+                  appSecret: process.env.FEISHU_APP_SECRET,
+                  appToken: process.env.FEISHU_APP_TOKEN,
+                  tableId: process.env.FEISHU_TABLE_ID
+                });
+              } catch (err) {
+                console.warn(`[WEBHOOK] 知识库读取失败: ${err.message}`);
+              }
+              const userPrompt = buildUserPrompt(preferences, knowledgeBase, {});
+              const apiKey = process.env.DEEPSEEK_API_KEY;
+              const markdown = await generateGuide(apiKey, SYSTEM_PROMPT, userPrompt);
+              const cityName = (preferences.cities || ['China']).join('·');
+              const docContent = generateDoc(markdown, `${cityName} Travel Guide`);
+              const fileName = `guide-${Date.now()}.doc`;
+              const filePath = path.join('/tmp', fileName);
+              fs.writeFileSync(filePath, docContent);
+              console.log(`[WEBHOOK] ✅ 攻略已生成: ${filePath}，需发送至 ${email}`);
+            }
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ received: true }));
+        } catch (err) {
+          console.error('[WEBHOOK ERROR]', err);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ received: true }));
+        }
+      });
+      return;
+    }
+
     // POST / → 生成攻略
     if (req.method === 'POST') {
       let chunks = '';
