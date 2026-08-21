@@ -358,7 +358,7 @@ if (require.main === module) {
         }, null, 2));
         return;
       }
-      // SMTP 深度诊断：实际测试连接 + 发送测试邮件
+      // SMTP 深度诊断：实际测试连接
       if (req.url === '/smtp-check') {
         const cfg = getSmtpConfig();
         let result = {
@@ -396,7 +396,6 @@ if (require.main === module) {
         res.end(JSON.stringify(result, null, 2));
         return;
       }
-
       // Paddle SDK 本地托管（避免 CDN 在国内被 DNS 污染）
       if (req.url === '/paddle.js' || req.url === '/v2/paddle.js') {
         try {
@@ -480,6 +479,10 @@ if (require.main === module) {
         }
         return;
       }
+      // GET 兜底：未匹配路由
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: 'Not Found', path: req.url, method: req.method }));
+      return;
     }
 
     // POST /webhook — Paddle 支付通知（交易完成时自动触发）
@@ -592,8 +595,8 @@ if (require.main === module) {
         res.end(result.body);
       });
     } else {
-      res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('Method Not Allowed');
+      res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: 'Method Not Allowed', method: req.method, path: req.url, hint: 'Use GET for pages/debug, POST for API/webhook' }));
     }
   });
 
