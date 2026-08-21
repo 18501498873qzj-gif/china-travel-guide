@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 let nodemailer = null;
 try { nodemailer = require('nodemailer'); } catch (e) { /* nodemailer 可选，没装也不影响核心功能 */ }
 
@@ -430,9 +431,22 @@ if (require.main === module) {
               const cityName = (preferences.cities || ['China']).join('·');
               const docContent = generateDoc(markdown, `${cityName} Travel Guide`);
               const fileName = `guide-${Date.now()}.doc`;
-              const filePath = path.join('/tmp', fileName);
+              const filePath = path.join(os.tmpdir(), fileName);
               fs.writeFileSync(filePath, docContent);
               console.log(`[WEBHOOK] ✅ 攻略已生成: ${filePath}，需发送至 ${email}`);
+
+              // Send email with .doc attachment
+              try {
+                const docBuffer = fs.readFileSync(filePath);
+                const emailResult = await sendGuideEmail(email, fileName, docBuffer, preferences);
+                if (emailResult.ok) {
+                  console.log(`[WEBHOOK] ✅ 邮件已发送至 ${email}`);
+                } else {
+                  console.warn(`[WEBHOOK] ⚠️ 邮件发送失败: ${emailResult.reason}`);
+                }
+              } catch (mailErr) {
+                console.warn(`[WEBHOOK] ⚠️ 邮件发送异常: ${mailErr.message}`);
+              }
             }
           }
           res.writeHead(200, { 'Content-Type': 'application/json' });
