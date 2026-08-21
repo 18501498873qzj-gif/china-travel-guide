@@ -298,6 +298,18 @@ if (require.main === module) {
 
       // GET 路由
     if (req.method === 'GET') {
+      // 订单页面
+      if (req.url === '/order' || req.url === '/order.html' || req.url.startsWith('/order?')) {
+        try {
+          const html = fs.readFileSync(path.join(__dirname, 'order.html'), 'utf-8');
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(html);
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(`Order page load failed: ${err.message}`);
+        }
+        return;
+      }
       // 定价页面
       if (req.url === '/pricing' || req.url === '/pricing.html') {
         try {

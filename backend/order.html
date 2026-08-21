@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order - China Travel Guide</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #333; line-height: 1.6; padding: 1rem; }
+.wrap { max-width: 640px; margin: 0 auto; }
+.card { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); padding: 2rem; margin-bottom: 1.5rem; }
+h1 { font-size: 1.5rem; color: #1a1a1a; }
+h2 { font-size: 1.1rem; color: #c0392b; margin: 1.2rem 0 0.6rem; border-bottom: 1px solid #eee; padding-bottom: 0.3rem; }
+.price-box { text-align: center; margin-bottom: 1rem; }
+.price-tag { font-size: 2.5rem; font-weight: 700; color: #1a1a1a; }
+.price-tag sup { font-size: 1rem; vertical-align: super; }
+.price-tag span { font-size: 0.9rem; font-weight: 400; color: #666; }
+label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem; color: #555; }
+.hint { font-size: 0.75rem; color: #999; font-weight: 400; }
+input, select, textarea { width: 100%; padding: 0.6rem 0.7rem; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; font-family: inherit; transition: border-color 0.2s; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: #c0392b; }
+textarea { resize: vertical; min-height: 60px; }
+.row { display: flex; gap: 1rem; }
+.row .fg { flex: 1; }
+.fg { margin-bottom: 1rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chip { padding: 0.35rem 0.7rem; border: 1.5px solid #ddd; border-radius: 20px; font-size: 0.78rem; cursor: pointer; user-select: none; transition: all 0.15s; background: #fff; }
+.chip.active { border-color: #c0392b; background: #c0392b; color: #fff; }
+.btn { display: block; width: 100%; background: #c0392b; color: #fff; border: none; padding: 1rem; border-radius: 10px; font-size: 1.15rem; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+.btn:hover { background: #a02817; }
+.btn:disabled { background: #ccc; cursor: not-allowed; }
+.back { display: inline-block; margin-top: 1rem; color: #666; text-decoration: none; font-size: 0.9rem; }
+.back:hover { color: #333; }
+/* Success state */
+.success-box { text-align: center; padding: 2rem; }
+.success-box .check { font-size: 3rem; margin-bottom: 0.5rem; }
+.spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #eee; border-top-color: #c0392b; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-msg { color: #c0392b; font-size: 0.9rem; margin-top: 0.5rem; }
+@media (max-width: 600px) { .row { flex-direction: column; gap: 0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- Form view -->
+<div id="formView">
+  <div class="card">
+    <div class="price-box">
+      <h1>Customize Your China Travel Itinerary</h1>
+      <p style="color:#666;margin-top:0.3rem;font-size:0.85rem;">AI-powered · Local knowledge · 23 languages</p>
+      <div class="price-tag"><sup>$</sup>9.9 <span>USD</span></div>
+      <p style="color:#888;font-size:0.8rem;">One-time payment · Instant download + Email delivery</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>① Your Info · 联系方式</h2>
+    <div class="fg">
+      <label>Email · 邮箱 <span class="hint">(required · 攻略.doc 将发送到此邮箱)</span></label>
+      <input type="email" id="email" placeholder="your@email.com">
+    </div>
+
+    <h2>② Trip Setup · 行程设置</h2>
+    <div class="fg">
+      <label>Cities · 目标城市 <span class="hint">逗号分隔 / comma separated</span></label>
+      <input type="text" id="cities" placeholder="e.g. Beijing, Xi'an, Chengdu">
+    </div>
+    <div class="row">
+      <div class="fg">
+        <label>Days · 天数</label>
+        <input type="number" id="days" min="1" max="30" value="5">
+      </div>
+      <div class="fg">
+        <label>Travelers · 出行人数</label>
+        <select id="travelers">
+          <option value="1">👤 Solo</option>
+          <option value="2" selected>👥 Couple</option>
+          <option value="3-4">👨‍👩‍👧 Family (3-4)</option>
+          <option value="5-8">👨‍👩‍👧‍👦 Family (5-8)</option>
+          <option value="9+">👥 Group (9+)</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="fg">
+        <label>Arrival Date · 出发日期</label>
+        <input type="date" id="arrivalDate">
+      </div>
+      <div class="fg">
+        <label>Budget · 预算</label>
+        <select id="budget">
+          <option value="Backpacker (under ¥200/day)">🎒 Backpacker</option>
+          <option value="Economy (¥200-500/day)" selected>💵 Economy</option>
+          <option value="Comfort (¥500-1000/day)">💴 Comfort</option>
+          <option value="Luxury (over ¥1000/day)">💎 Luxury</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="fg">
+        <label>Hotel · 住宿偏好</label>
+        <select id="hotelPref">
+          <option value="Balanced (mix)" selected>🎯 Balanced</option>
+          <option value="Budget hostels & guesthouses (under $50)">🏠 Budget</option>
+          <option value="3-4★ business hotels ($50-150)">🏨 3-4★ Business</option>
+          <option value="5★ luxury &amp; heritage ($200+)">👑 5★ Luxury</option>
+          <option value="Boutique &amp; design hotels">🎨 Boutique</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Transport · 交通偏好</label>
+        <select id="transportPref">
+          <option value="Balanced (metro + taxi + high-speed rail)" selected>🎯 Balanced</option>
+          <option value="Public transit only (metro / bus)">🚇 Public transit</option>
+          <option value="Taxi / DiDi preferred (max convenience)">🚕 Taxi/DiDi</option>
+          <option value="High-speed rail for every city-hop">🚄 High-speed rail</option>
+          <option value="Flight for long-haul city-hop">✈️ Flight</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Travel Style · 旅行节奏</label>
+      <select id="travelStyle">
+        <option value="Check-in rush (max spots)">⚡ Check-in rush</option>
+        <option value="Balanced" selected>🎯 Balanced</option>
+        <option value="Slow & Relaxed">☕ Slow & Relaxed</option>
+      </select>
+    </div>
+
+    <h2>③ Interests · 兴趣方向 <span class="hint">多选 / multi-select</span></h2>
+    <div class="chips" id="interests">
+      <div class="chip active" data-value="Landmarks & UNESCO">🏛️ Landmarks</div>
+      <div class="chip active" data-value="Food & Street Food">🍜 Food</div>
+      <div class="chip" data-value="Photo Spots">📸 Photo Spots</div>
+      <div class="chip" data-value="Nature & Scenery">🏔️ Nature</div>
+      <div class="chip" data-value="Night Markets">🌙 Night Markets</div>
+      <div class="chip" data-value="Shopping">🛍️ Shopping</div>
+      <div class="chip" data-value="Art Museums">🎨 Museums</div>
+      <div class="chip" data-value="City Skyline Views">🌃 Skyline Views</div>
+      <div class="chip" data-value="Temples">⛩️ Temples</div>
+      <div class="chip" data-value="Street Life & Markets">🚶 Street Life</div>
+      <div class="chip" data-value="Futuristic & Modern">🚀 Futuristic</div>
+      <div class="chip" data-value="Pandas & Wildlife">🐼 Pandas</div>
+    </div>
+
+    <h2>④ Language & Dietary · 语言与饮食</h2>
+    <div class="row">
+      <div class="fg">
+        <label>Guide Language · 攻略语言</label>
+        <select id="language">
+          <option value="English" selected>🇺🇸 English (US)</option>
+          <option value="English (UK)">🇬🇧 English (UK)</option>
+          <option value="English (AU)">🇦🇺 English (AU)</option>
+          <option value="English (CA)">🇨🇦 English (CA)</option>
+          <option value="中文">🇨🇳 中文（简体）</option>
+          <option value="中文(繁体)">🇹🇼 中文（繁體）</option>
+          <option value="日本語">🇯🇵 日本語</option>
+          <option value="한국어">🇰🇷 한국어</option>
+          <option value="Français">🇫🇷 Français</option>
+          <option value="Deutsch">🇩🇪 Deutsch</option>
+          <option value="Español">🇪🇸 Español</option>
+          <option value="Español (MX)">🇲🇽 Español (MX)</option>
+          <option value="Italiano">🇮🇹 Italiano</option>
+          <option value="Português">🇵🇹 Português</option>
+          <option value="Português (BR)">🇧🇷 Português (BR)</option>
+          <option value="Русский">🇷🇺 Русский</option>
+          <option value="ไทย">🇹🇭 ไทย</option>
+          <option value="Tiếng Việt">🇻🇳 Tiếng Việt</option>
+          <option value="Bahasa Indonesia">🇮🇩 Bahasa Indonesia</option>
+          <option value="Bahasa Melayu">🇲🇾 Bahasa Melayu</option>
+          <option value="Filipino">🇵🇭 Filipino</option>
+          <option value="हिन्दी">🇮🇳 हिन्दी</option>
+          <option value="العربية">🇦🇪 العربية</option>
+          <option value="Türkçe">🇹🇷 Türkçe</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Currency · 货币</label>
+        <select id="currency">
+          <option value="USD">🇺🇸 USD</option>
+          <option value="CNY">🇨🇳 CNY</option>
+          <option value="EUR">🇪🇺 EUR</option>
+          <option value="GBP">🇬🇧 GBP</option>
+          <option value="JPY">🇯🇵 JPY</option>
+          <option value="KRW">🇰🇷 KRW</option>
+          <option value="HKD">🇭🇰 HKD</option>
+          <option value="TWD">🇹🇼 TWD</option>
+          <option value="SGD">🇸🇬 SGD</option>
+          <option value="AUD">🇦🇺 AUD</option>
+          <option value="CAD">🇨🇦 CAD</option>
+          <option value="INR">🇮🇳 INR</option>
+          <option value="RUB">🇷🇺 RUB</option>
+          <option value="BRL">🇧🇷 BRL</option>
+          <option value="MXN">🇲🇽 MXN</option>
+          <option value="AED">🇦🇪 AED</option>
+          <option value="TRY">🇹🇷 TRY</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Dietary · 饮食要求 <span class="hint">选填 / optional</span></label>
+      <input type="text" id="dietary" placeholder="e.g. Vegetarian, no pork, halal, no spicy">
+    </div>
+    <div class="fg">
+      <label>Notes · 补充说明 <span class="hint">选填 / optional</span></label>
+      <textarea id="notes" placeholder="e.g. traveling with seniors, must see Giant Panda, wheelchair access"></textarea>
+    </div>
+
+    <button class="btn" id="buyBtn">Buy Now — $9.9</button>
+    <div class="error-msg" id="formError"></div>
+  </div>
+</div>
+
+<!-- Success view -->
+<div id="successView" style="display:none;">
+  <div class="card">
+    <div class="success-box" id="successBox">
+      <div class="check">✅</div>
+      <h1>Payment Successful!</h1>
+      <p style="color:#666;margin-top:0.3rem;">Generating your personalized travel guide...</p>
+    </div>
+    <div id="genStatus" style="text-align:center;padding:1.5rem;">
+      <div class="spinner"></div>
+      <p style="margin-top:0.8rem;color:#888;font-size:0.9rem;">AI is creating your guide (60-120 seconds)...</p>
+    </div>
+    <div id="genResult" style="display:none;text-align:center;padding:1rem;">
+      <p id="resultText"></p>
+      <a href="/" class="back" style="margin-top:1rem;display:inline-block;">← Back to Home</a>
+    </div>
+    <div id="genError" style="display:none;text-align:center;padding:1rem;">
+      <p class="error-msg" id="errorText"></p>
+      <a href="/" class="back" style="margin-top:1rem;display:inline-block;">← Back to Home</a>
+    </div>
+  </div>
+</div>
+
+<a href="/" class="back">← Back to Home</a>
+</div>
+
+<!-- Paddle SDK -->
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+<script>
+// Initialize Paddle
+Paddle.Environment.set('live');
+Paddle.Initialize({ token: 'live_8de9d646e470503d57b4c3cdc60' });
+
+// Chip multi-select
+document.querySelectorAll('#interests .chip').forEach(chip => {
+  chip.addEventListener('click', () => chip.classList.toggle('active'));
+});
+
+// Arrival date default = today + 14 days
+(function defaultArrivalDate(){
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  document.getElementById('arrivalDate').value = `${y}-${m}-${day}`;
+})();
+
+// Collect form data
+function collectFormData() {
+  const email = document.getElementById('email').value.trim();
+  const cities = document.getElementById('cities').value.trim().split(/[,，]/).map(s => s.trim()).filter(Boolean);
+  const days = parseInt(document.getElementById('days').value);
+  const travelers = document.getElementById('travelers').value;
+  const arrivalDate = document.getElementById('arrivalDate').value || '';
+  const budget = document.getElementById('budget').value;
+  const hotelPref = document.getElementById('hotelPref').value;
+  const transportPref = document.getElementById('transportPref').value;
+  const travelStyle = document.getElementById('travelStyle').value;
+  const interests = [...document.querySelectorAll('#interests .chip.active')].map(c => c.dataset.value);
+  const language = document.getElementById('language').value;
+  const currency = document.getElementById('currency').value;
+  const dietary = document.getElementById('dietary').value.trim();
+  const notes = document.getElementById('notes').value.trim();
+
+  return { email, cities, days, travelers, arrivalDate, budget, hotelPref, transportPref, travelStyle, interests, language, currency, dietary, notes };
+}
+
+// Validate form
+function validateForm(data) {
+  if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    return 'Please enter a valid email address.';
+  }
+  if (data.cities.length === 0) {
+    return 'Please enter at least one city.';
+  }
+  if (!data.days || data.days < 1) {
+    return 'Please enter the number of days.';
+  }
+  if (data.interests.length === 0) {
+    return 'Please select at least one interest.';
+  }
+  return null;
+}
+
+// Buy button → open Paddle checkout
+document.getElementById('buyBtn').addEventListener('click', () => {
+  const data = collectFormData();
+  const err = validateForm(data);
+  if (err) {
+    document.getElementById('formError').textContent = err;
+    return;
+  }
+  document.getElementById('formError').textContent = '';
+
+  // Save form data to sessionStorage for retrieval after redirect
+  sessionStorage.setItem('orderFormData', JSON.stringify(data));
+
+  // Open Paddle checkout
+  Paddle.Checkout.open({
+    items: [{ priceId: 'pri_01m0h0hs1axtqq0fzssmk99qm1', quantity: 1 }],
+    customer: { email: data.email },
+    settings: {
+      successUrl: window.location.origin + '/order?success=true',
+      themeMode: 'light'
+    },
+    eventCallback: function(event) {
+      if (event.name === 'checkout.completed') {
+        // Payment succeeded — redirect to success page
+        window.location.href = window.location.origin + '/order?success=true';
+      }
+    }
+  });
+});
+
+// ---- Success page logic ----
+if (new URLSearchParams(window.location.search).get('success') === 'true') {
+  document.getElementById('formView').style.display = 'none';
+  document.getElementById('successView').style.display = 'block';
+
+  const savedData = sessionStorage.getItem('orderFormData');
+  if (!savedData) {
+    // No form data — show generic success (user may have reopened the URL)
+    document.getElementById('genStatus').style.display = 'none';
+    document.getElementById('genResult').style.display = 'block';
+    document.getElementById('resultText').innerHTML = '✅ Payment received! Your guide is being processed and will be emailed to you shortly.';
+  } else {
+    // Have form data — auto-call backend API to generate guide
+    const formData = JSON.parse(savedData);
+    const preferences = {
+      cities: formData.cities,
+      days: formData.days,
+      budget: formData.budget,
+      interests: formData.interests,
+      travelStyle: formData.travelStyle,
+      language: formData.language,
+      currency: formData.currency,
+      dietary: formData.dietary,
+      notes: formData.notes,
+      email: formData.email,
+      travelers: formData.travelers,
+      arrivalDate: formData.arrivalDate,
+      hotelPref: formData.hotelPref,
+      transportPref: formData.transportPref,
+      firstCity: formData.cities[0] || ''
+    };
+
+    document.getElementById('successBox').innerHTML =
+      '<div class="check">✅</div><h1>Payment Successful!</h1><p style="color:#666;margin-top:0.3rem;">Generating guide for: ' +
+      formData.cities.join(', ') + ' · ' + formData.days + ' days</p>';
+
+    // Call backend API
+    fetch('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preferences, format: 'doc' })
+    })
+    .then(res => res.json().then(data => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+      document.getElementById('genStatus').style.display = 'none';
+      if (!ok) throw new Error(data.error || 'Generation failed');
+
+      // Trigger browser download of the .doc
+      if (data.docBase64) {
+        const binary = atob(data.docBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = data.fileName || 'travel-guide.doc';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      let html = '🎉 <strong>Your guide is ready!</strong><br>';
+      html += 'The .doc file has been downloaded to your device.<br>';
+      if (data.email && data.email.ok) {
+        html += '✅ A copy has also been sent to <strong>' + formData.email + '</strong>';
+      } else if (data.email && !data.email.ok) {
+        html += '⚠️ Email delivery failed: ' + (data.email.reason || 'unknown error');
+      }
+      document.getElementById('resultText').innerHTML = html;
+      document.getElementById('genResult').style.display = 'block';
+
+      // Clear sessionStorage
+      sessionStorage.removeItem('orderFormData');
+    })
+    .catch(err => {
+      document.getElementById('genStatus').style.display = 'none';
+      document.getElementById('errorText').textContent = '❌ Guide generation failed: ' + err.message + '. Please contact 18501498873qzj@gmail.com — your payment was successful and we will manually generate your guide.';
+      document.getElementById('genError').style.display = 'block';
+      sessionStorage.removeItem('orderFormData');
+    });
+  }
+}
+</script>
+</body>
+</html>
