@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>订单管理 - China Travel Guide</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #333; line-height: 1.6; padding: 1rem; }
+.wrap { max-width: 1100px; margin: 0 auto; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem; }
+.header h1 { font-size: 1.5rem; color: #9B2335; }
+.header .stats { font-size: 0.85rem; color: #888; }
+.search-box { margin-bottom: 1rem; }
+.search-box input { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; font-family: inherit; }
+.search-box input:focus { outline: none; border-color: #9B2335; }
+table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+th { background: #9B2335; color: #fff; padding: 0.7rem 0.5rem; text-align: left; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+td { padding: 0.6rem 0.5rem; border-bottom: 1px solid #f0f0f0; font-size: 0.82rem; vertical-align: top; }
+tr:hover { background: #fff9f9; }
+tr:last-child td { border-bottom: none; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; }
+.badge-ok { background: #d4edda; color: #155724; }
+.badge-fail { background: #f8d7da; color: #721c24; }
+.badge-pending { background: #fff3cd; color: #856404; }
+.expand-row td { background: #fafafa; padding: 0.8rem 0.5rem; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem; }
+.detail-item { font-size: 0.78rem; }
+.detail-item .label { color: #999; font-size: 0.72rem; }
+.detail-item .value { color: #333; font-weight: 500; word-break: break-all; }
+.loading { text-align: center; padding: 3rem; color: #999; }
+.empty { text-align: center; padding: 3rem; color: #999; }
+.back-link { display: inline-block; margin-top: 1rem; color: #666; text-decoration: none; font-size: 0.9rem; }
+.back-link:hover { color: #9B2335; }
+@media (max-width: 768px) { .table-wrap { overflow-x: auto; } table { min-width: 700px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>📋 订单管理</h1>
+    <div class="stats" id="stats">加载中...</div>
+  </div>
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="搜索订单号或邮箱..." oninput="filterTable()">
+  </div>
+  <div class="table-wrap">
+    <table id="ordersTable">
+      <thead>
+        <tr>
+          <th>订单号</th>
+          <th>支付时间</th>
+          <th>邮箱</th>
+          <th>城市</th>
+          <th>天数</th>
+          <th>人数</th>
+          <th>语言</th>
+          <th>金额</th>
+          <th>攻略</th>
+          <th>邮件</th>
+          <th>详情</th>
+        </tr>
+      </thead>
+      <tbody id="ordersBody">
+        <tr><td colspan="11" class="loading">⏳ 加载中...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <a href="/" class="back-link">← 返回首页</a>
+</div>
+<script>
+const ADMIN_KEY = new URLSearchParams(window.location.search).get('key') || '';
+let allOrders = [];
+
+async function loadOrders() {
+  try {
+    const res = await fetch(`/admin/orders/api?key=${encodeURIComponent(ADMIN_KEY)}`);
+    if (res.status === 403) {
+      document.getElementById('ordersBody').innerHTML = '<tr><td colspan="11" class="empty">⛔ 无权限访问，请提供正确的 admin key。</td></tr>';
+      return;
+    }
+    const data = await res.json();
+    allOrders = data.orders || [];
+    renderTable(allOrders);
+    document.getElementById('stats').textContent = `共 ${allOrders.length} 条订单（保留30天）`;
+  } catch (err) {
+    document.getElementById('ordersBody').innerHTML = `<tr><td colspan="11" class="empty">加载失败: ${err.message}</td></tr>`;
+  }
+}
+
+function formatTime(iso) {
+  try {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  } catch(e) { return iso; }
+}
+
+function badge(ok, label) {
+  if (ok === true) return `<span class="badge badge-ok">${label || '✓'}</span>`;
+  if (ok === false) return `<span class="badge badge-fail">${label || '✗'}</span>`;
+  return `<span class="badge badge-pending">待处理</span>`;
+}
+
+function renderTable(orders) {
+  const tbody = document.getElementById('ordersBody');
+  if (!orders.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="empty">📭 暂无订单记录</td></tr>';
+    return;
+  }
+  tbody.innerHTML = orders.map((o, i) => {
+    const f = o.formData || {};
+    const cities = Array.isArray(f.cities) ? f.cities.join(', ') : (f.cities || '-');
+    const interests = Array.isArray(f.interests) ? f.interests.join(', ') : (f.interests || '-');
+    return `
+      <tr onclick="toggleDetail(${i})" style="cursor:pointer">
+        <td style="font-family:'Courier New',monospace;font-weight:600;color:#9B2335">${o.orderId}</td>
+        <td>${formatTime(o.paidAt)}</td>
+        <td style="word-break:break-all">${o.email}</td>
+        <td>${cities}</td>
+        <td>${f.days || '-'}</td>
+        <td>${f.travelers || '-'}</td>
+        <td>${f.language || '-'}</td>
+        <td>${o.amount || 9.90} ${o.currency || 'USD'}</td>
+        <td>${badge(o.guideGenerated)}</td>
+        <td>${badge(o.emailSent)}</td>
+        <td style="font-size:0.75rem;color:#999">▾ 展开</td>
+      </tr>
+      <tr class="expand-row" id="detail-${i}" style="display:none">
+        <td colspan="11">
+          <div class="detail-grid">
+            <div class="detail-item"><div class="label">交易ID</div><div class="value">${o.transactionId || '-'}</div></div>
+            <div class="detail-item"><div class="label">到达日期</div><div class="value">${f.arrivalDate || '-'}</div></div>
+            <div class="detail-item"><div class="label">预算</div><div class="value">${f.budget || '-'}</div></div>
+            <div class="detail-item"><div class="label">住宿偏好</div><div class="value">${f.hotelPref || '-'}</div></div>
+            <div class="detail-item"><div class="label">交通偏好</div><div class="value">${f.transportPref || '-'}</div></div>
+            <div class="detail-item"><div class="label">旅行节奏</div><div class="value">${f.travelStyle || '-'}</div></div>
+            <div class="detail-item"><div class="label">兴趣方向</div><div class="value">${interests}</div></div>
+            <div class="detail-item"><div class="label">货币</div><div class="value">${f.currency || '-'}</div></div>
+            <div class="detail-item"><div class="label">饮食要求</div><div class="value">${f.dietary || '-'}</div></div>
+            <div class="detail-item" style="grid-column:1/-1"><div class="label">补充说明</div><div class="value">${f.notes || '无'}</div></div>
+            ${o.emailError ? `<div class="detail-item" style="grid-column:1/-1"><div class="label">邮件发送错误</div><div class="value" style="color:#c0392b">${o.emailError}</div></div>` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function toggleDetail(i) {
+  const row = document.getElementById(`detail-${i}`);
+  if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  if (!q) { renderTable(allOrders); return; }
+  const filtered = allOrders.filter(o =>
+    (o.orderId || '').toLowerCase().includes(q) ||
+    (o.email || '').toLowerCase().includes(q)
+  );
+  renderTable(filtered);
+  document.getElementById('stats').textContent = `找到 ${filtered.length} / ${allOrders.length} 条订单`;
+}
+
+loadOrders();
+</script>
+</body>
+</html>

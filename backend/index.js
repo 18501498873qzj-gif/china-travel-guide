@@ -20,6 +20,56 @@ setInterval(() => {
   }
 }, 60 * 1000).unref(); // 每 1 分钟清理一次，unref 不阻塞进程退出
 
+// ---------- 订单存储模块（JSON 文件持久化，保留30天）----------
+const ORDERS_FILE = path.join(os.tmpdir(), 'ctg-orders.json');
+const ORDERS_MAX_COUNT = 500;
+const ORDERS_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30天
+
+function loadOrders() {
+  try {
+    if (!fs.existsSync(ORDERS_FILE)) return [];
+    const raw = fs.readFileSync(ORDERS_FILE, 'utf-8');
+    const data = JSON.parse(raw);
+    return Array.isArray(data.orders) ? data.orders : [];
+  } catch (e) {
+    console.warn('[ORDERS] 读取订单文件失败:', e.message);
+    return [];
+  }
+}
+
+function saveOrder(order) {
+  try {
+    let orders = loadOrders();
+    // 清理30天前的订单
+    const now = Date.now();
+    orders = orders.filter(o => {
+      const t = new Date(o.paidAt).getTime();
+      return Number.isFinite(t) && (now - t) < ORDERS_TTL_MS;
+    });
+    orders.unshift(order); // 最新的排最前
+    // 超过上限删最早的
+    if (orders.length > ORDERS_MAX_COUNT) orders = orders.slice(0, ORDERS_MAX_COUNT);
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify({ orders, lastCleanup: now }), 'utf-8');
+    console.log(`[ORDERS] 订单已保存: ${order.orderId}，当前共 ${orders.length} 条`);
+  } catch (e) {
+    console.error('[ORDERS] 保存订单失败:', e.message);
+  }
+}
+
+function updateOrderStatus(orderId, patch) {
+  try {
+    let orders = loadOrders();
+    const idx = orders.findIndex(o => o.orderId === orderId);
+    if (idx >= 0) {
+      Object.assign(orders[idx], patch);
+      fs.writeFileSync(ORDERS_FILE, JSON.stringify({ orders, lastCleanup: Date.now() }), 'utf-8');
+      console.log(`[ORDERS] 订单 ${orderId} 状态已更新:`, JSON.stringify(patch));
+    }
+  } catch (e) {
+    console.error('[ORDERS] 更新订单状态失败:', e.message);
+  }
+}
+
 // 本地开发：加载 .env 文件（无需 dotenv 依赖）
 if (process.env.NODE_ENV !== 'production') {
   const envPath = path.join(__dirname, '.env');
@@ -698,6 +748,41 @@ if (require.main === module) {
         }
         return;
       }
+      // 管理员订单 API — 返回 JSON
+      if (req.method === 'GET' && req.url.startsWith('/admin/orders/api')) {
+        const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        const key = urlObj.searchParams.get('key');
+        const adminKey = process.env.ADMIN_PAGE_KEY;
+        if (!adminKey || key !== adminKey) {
+          res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ error: 'Unauthorized' }));
+          return;
+        }
+        const orders = loadOrders();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ orders, total: orders.length }));
+        return;
+      }
+      // 管理员订单页面 — 返回 HTML
+      if (req.method === 'GET' && (req.url === '/admin/orders' || req.url.startsWith('/admin/orders?'))) {
+        const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        const key = urlObj.searchParams.get('key');
+        const adminKey = process.env.ADMIN_PAGE_KEY;
+        if (!adminKey || key !== adminKey) {
+          res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end('<h1>403 Forbidden</h1><p>Access denied. Please provide a valid admin key.</p>');
+          return;
+        }
+        try {
+          const html = fs.readFileSync(path.join(__dirname, 'admin-orders.html'), 'utf-8');
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(html);
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(`Admin orders page load failed: ${err.message}`);
+        }
+        return;
+      }
       // 订单页面
       if (req.url === '/order' || req.url === '/order.html' || req.url.startsWith('/order?')) {
         try {
@@ -863,7 +948,36 @@ if (require.main === module) {
             }
             if (email && preferences) {
               console.log(`[WEBHOOK] 开始为 ${email} 生成攻略`);
-              
+
+              // 保存订单信息到持久化存储
+              const orderId = customData.orderId || `CTG-${Date.now()}`;
+              const txnAmount = transaction.amount || {};
+              saveOrder({
+                orderId,
+                transactionId: transaction.id || '',
+                email,
+                paidAt: transaction.completed_at || new Date().toISOString(),
+                amount: txnAmount.amount ? (Number(txnAmount.amount) / 100) : 9.90,
+                currency: txnAmount.currency || 'USD',
+                formData: {
+                  cities: preferences.cities || [],
+                  days: preferences.days || 0,
+                  travelers: preferences.travelers || '',
+                  arrivalDate: preferences.arrivalDate || '',
+                  budget: preferences.budget || '',
+                  hotelPref: preferences.hotelPref || '',
+                  transportPref: preferences.transportPref || '',
+                  travelStyle: preferences.travelStyle || '',
+                  interests: preferences.interests || [],
+                  language: preferences.language || 'English',
+                  currency: preferences.currency || 'USD',
+                  dietary: preferences.dietary || '',
+                  notes: preferences.notes || ''
+                },
+                guideGenerated: false,
+                emailSent: false
+              });
+
               const { fetchKnowledgeBase } = require('./feishu');
               const { generateGuide } = require('./deepseek');
               const { generateDoc } = require('./docgen');
@@ -889,14 +1003,19 @@ if (require.main === module) {
               fs.writeFileSync(filePath, docContent);
               console.log(`[WEBHOOK] ✅ 攻略已生成: ${filePath}，需发送至 ${email}`);
 
+              // 更新订单状态：攻略已生成
+              updateOrderStatus(orderId, { guideGenerated: true });
+
               // Send email with .doc attachment
               try {
                 const docBuffer = fs.readFileSync(filePath);
                 const emailResult = await sendGuideEmail(email, fileName, docBuffer, preferences);
                 if (emailResult.ok) {
                   console.log(`[WEBHOOK] ✅ 邮件已发送至 ${email}`);
+                  updateOrderStatus(orderId, { emailSent: true });
                 } else {
                   console.warn(`[WEBHOOK] ⚠️ 邮件发送失败: ${emailResult.reason}`);
+                  updateOrderStatus(orderId, { emailSent: false, emailError: emailResult.reason });
                 }
               } catch (mailErr) {
                 console.warn(`[WEBHOOK] ⚠️ 邮件发送异常: ${mailErr.message}`);
