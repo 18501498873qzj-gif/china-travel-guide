@@ -24,7 +24,9 @@ textarea { resize: vertical; min-height: 60px; }
 .row .fg { flex: 1; }
 .fg { margin-bottom: 1rem; }
 .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.chip { padding: 0.35rem 0.7rem; border: 1.5px solid #ddd; border-radius: 20px; font-size: 0.78rem; cursor: pointer; user-select: none; transition: all 0.15s; background: #fff; }
+.chip { padding: 0.45rem 0.85rem; border: 1.5px solid #ddd; border-radius: 20px; font-size: 0.82rem; cursor: pointer; -webkit-user-select: none; user-select: none; transition: all 0.15s; background: #fff; -webkit-tap-highlight-color: transparent; touch-action: manipulation; display: inline-flex; align-items: center; min-height: 2.2rem; }
+.chip:focus { outline: 2px solid #c0392b; outline-offset: 1px; }
+.chip:active { transform: scale(0.96); }
 .chip.active { border-color: #c0392b; background: #c0392b; color: #fff; }
 .btn { display: block; width: 100%; background: #c0392b; color: #fff; border: none; padding: 1rem; border-radius: 10px; font-size: 1.15rem; font-weight: 700; cursor: pointer; transition: background 0.2s; }
 .btn:hover { background: #a02817; }
@@ -55,13 +57,69 @@ textarea { resize: vertical; min-height: 60px; }
   </div>
 
   <div class="card">
-    <h2>① Your Info · 联系方式</h2>
+    
+    <h2>① Language · 语言设置</h2>
+    <div class="row">
+      <div class="fg">
+        <label>Guide Language · 攻略语言 <span class="hint">(攻略内容用此语言生成)</span></label>
+        <select id="language">
+          <option value="English" selected>🇺🇸 English (US)</option>
+          <option value="English (UK)">🇬🇧 English (UK)</option>
+          <option value="English (AU)">🇦🇺 English (AU)</option>
+          <option value="English (CA)">🇨🇦 English (CA)</option>
+          <option value="中文">🇨🇳 中文（简体）</option>
+          <option value="中文(繁体)">🇹🇼 中文（繁體）</option>
+          <option value="日本語">🇯🇵 日本語</option>
+          <option value="한국어">🇰🇷 한국어</option>
+          <option value="Français">🇫🇷 Français</option>
+          <option value="Deutsch">🇩🇪 Deutsch</option>
+          <option value="Español">🇪🇸 Español</option>
+          <option value="Español (MX)">🇲🇽 Español (MX)</option>
+          <option value="Italiano">🇮🇹 Italiano</option>
+          <option value="Português">🇵🇹 Português</option>
+          <option value="Português (BR)">🇧🇷 Português (BR)</option>
+          <option value="Русский">🇷🇺 Русский</option>
+          <option value="ไทย">🇹🇭 ไทย</option>
+          <option value="Tiếng Việt">🇻🇳 Tiếng Việt</option>
+          <option value="Bahasa Indonesia">🇮🇩 Bahasa Indonesia</option>
+          <option value="Bahasa Melayu">🇲🇾 Bahasa Melayu</option>
+          <option value="Filipino">🇵🇭 Filipino</option>
+          <option value="हिन्दी">🇮🇳 हिन्दी</option>
+          <option value="العربية">🇦🇪 العربية</option>
+          <option value="Türkçe">🇹🇷 Türkçe</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Currency · 货币 <span class="hint">(预算区间按此货币显示)</span></label>
+        <select id="currency">
+          <option value="USD" selected>🇺🇸 USD</option>
+          <option value="CNY">🇨🇳 CNY</option>
+          <option value="EUR">🇪🇺 EUR</option>
+          <option value="GBP">🇬🇧 GBP</option>
+          <option value="JPY">🇯🇵 JPY</option>
+          <option value="KRW">🇰🇷 KRW</option>
+          <option value="HKD">🇭🇰 HKD</option>
+          <option value="TWD">🇹🇼 TWD</option>
+          <option value="SGD">🇸🇬 SGD</option>
+          <option value="AUD">🇦🇺 AUD</option>
+          <option value="CAD">🇨🇦 CAD</option>
+          <option value="INR">🇮🇳 INR</option>
+          <option value="RUB">🇷🇺 RUB</option>
+          <option value="BRL">🇧🇷 BRL</option>
+          <option value="MXN">🇲🇽 MXN</option>
+          <option value="AED">🇦🇪 AED</option>
+          <option value="TRY">🇹🇷 TRY</option>
+        </select>
+      </div>
+    </div>
+
+<h2>② Your Info · 联系方式</h2>
     <div class="fg">
       <label>Email · 邮箱 <span class="hint">(required · 攻略.doc 将发送到此邮箱)</span></label>
       <input type="email" id="email" placeholder="your@email.com">
     </div>
 
-    <h2>② Trip Setup · 行程设置</h2>
+    <h2>③ Trip Setup · 行程设置</h2>
     <div class="fg">
       <label>Cities · 目标城市 <span class="hint">逗号分隔 / comma separated</span></label>
       <input type="text" id="cities" placeholder="e.g. Beijing, Xi'an, Chengdu">
@@ -90,11 +148,12 @@ textarea { resize: vertical; min-height: 60px; }
       <div class="fg">
         <label>Budget · 预算</label>
         <select id="budget">
-          <option value="Backpacker (under ¥200/day)">🎒 Backpacker</option>
-          <option value="Economy (¥200-500/day)" selected>💵 Economy</option>
-          <option value="Comfort (¥500-1000/day)">💴 Comfort</option>
-          <option value="Luxury (over ¥1000/day)">💎 Luxury</option>
+          <option value="Backpacker (under ¥200/day)" data-cny-low="100" data-cny-high="300">🎒 Backpacker · 经济穷游</option>
+          <option value="Economy (¥200-500/day)" data-cny-low="300" data-cny-high="600" selected>💵 Economy · 标准经济</option>
+          <option value="Comfort (¥500-1000/day)" data-cny-low="600" data-cny-high="1200">💴 Comfort · 舒适商务</option>
+          <option value="Luxury (over ¥1000/day)" data-cny-low="1200" data-cny-high="9999">💎 Luxury · 奢华游</option>
         </select>
+        <div id="budgetHint" style="margin-top:.35rem;font-size:.78rem;color:#555;background:#f8f9fa;padding:.4rem .6rem;border-radius:6px;line-height:1.5;"></div>
       </div>
     </div>
     <div class="row">
@@ -128,27 +187,27 @@ textarea { resize: vertical; min-height: 60px; }
       </select>
     </div>
 
-    <h2>③ Interests · 兴趣方向 <span class="hint">多选 / multi-select</span></h2>
+    <h2>④ Interests · 兴趣方向 <span class="hint">多选 / multi-select</span></h2>
     <div class="chips" id="interests">
       <div class="chip active" data-value="Landmarks & UNESCO">🏛️ Landmarks</div>
       <div class="chip active" data-value="Food & Street Food">🍜 Food</div>
-      <div class="chip" data-value="Photo Spots">📸 Photo Spots</div>
-      <div class="chip" data-value="Nature & Scenery">🏔️ Nature</div>
-      <div class="chip" data-value="Night Markets">🌙 Night Markets</div>
-      <div class="chip" data-value="Shopping">🛍️ Shopping</div>
-      <div class="chip" data-value="Art Museums">🎨 Museums</div>
-      <div class="chip" data-value="City Skyline Views">🌃 Skyline Views</div>
-      <div class="chip" data-value="Temples">⛩️ Temples</div>
-      <div class="chip" data-value="Street Life & Markets">🚶 Street Life</div>
-      <div class="chip" data-value="Futuristic & Modern">🚀 Futuristic</div>
-      <div class="chip" data-value="Pandas & Wildlife">🐼 Pandas</div>
+      <div class="chip" role="button" tabindex="0" data-value="Photo Spots">📸 Photo Spots</div>
+      <div class="chip" role="button" tabindex="0" data-value="Nature & Scenery">🏔️ Nature</div>
+      <div class="chip" role="button" tabindex="0" data-value="Night Markets">🌙 Night Markets</div>
+      <div class="chip" role="button" tabindex="0" data-value="Shopping">🛍️ Shopping</div>
+      <div class="chip" role="button" tabindex="0" data-value="Art Museums">🎨 Museums</div>
+      <div class="chip" role="button" tabindex="0" data-value="City Skyline Views">🌃 Skyline Views</div>
+      <div class="chip" role="button" tabindex="0" data-value="Temples">⛩️ Temples</div>
+      <div class="chip" role="button" tabindex="0" data-value="Street Life & Markets">🚶 Street Life</div>
+      <div class="chip" role="button" tabindex="0" data-value="Futuristic & Modern">🚀 Futuristic</div>
+      <div class="chip" role="button" tabindex="0" data-value="Pandas & Wildlife">🐼 Pandas</div>
     </div>
 
-    <h2>④ Language & Dietary · 语言与饮食</h2>
+    <h2>⑤ Preferences · 偏好与备注</h2>
     <div class="row">
       <div class="fg">
         <label>Guide Language · 攻略语言</label>
-        <select id="language">
+        <select data-removed="duplicate" style="display:none!important">
           <option value="English" selected>🇺🇸 English (US)</option>
           <option value="English (UK)">🇬🇧 English (UK)</option>
           <option value="English (AU)">🇦🇺 English (AU)</option>
@@ -177,25 +236,7 @@ textarea { resize: vertical; min-height: 60px; }
       </div>
       <div class="fg">
         <label>Currency · 货币</label>
-        <select id="currency">
-          <option value="USD">🇺🇸 USD</option>
-          <option value="CNY">🇨🇳 CNY</option>
-          <option value="EUR">🇪🇺 EUR</option>
-          <option value="GBP">🇬🇧 GBP</option>
-          <option value="JPY">🇯🇵 JPY</option>
-          <option value="KRW">🇰🇷 KRW</option>
-          <option value="HKD">🇭🇰 HKD</option>
-          <option value="TWD">🇹🇼 TWD</option>
-          <option value="SGD">🇸🇬 SGD</option>
-          <option value="AUD">🇦🇺 AUD</option>
-          <option value="CAD">🇨🇦 CAD</option>
-          <option value="INR">🇮🇳 INR</option>
-          <option value="RUB">🇷🇺 RUB</option>
-          <option value="BRL">🇧🇷 BRL</option>
-          <option value="MXN">🇲🇽 MXN</option>
-          <option value="AED">🇦🇪 AED</option>
-          <option value="TRY">🇹🇷 TRY</option>
-        </select>
+        <select data-removed2="duplicate" style="display:none!important">
       </div>
     </div>
     <div class="fg">
@@ -416,10 +457,29 @@ function openSimulatedCheckout(data) {
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 }
 
-// Chip multi-select
-document.querySelectorAll('#interests .chip').forEach(chip => {
-  chip.addEventListener('click', () => chip.classList.toggle('active'));
-});
+// Chip multi-select — fix both desktop click and mobile touch issues
+// Previous: only click event, which often fires twice or not at all on mobile
+(function bindChips() {
+  var chips = document.querySelectorAll('#interests .chip');
+  var touched = null;
+  function toggle(chip) {
+    chip.classList.toggle('active');
+    chip.setAttribute('aria-pressed', chip.classList.contains('active') ? 'true' : 'false');
+  }
+  for (var i = 0; i < chips.length; i++) {
+    var c = chips[i];
+    c.setAttribute('aria-pressed', c.classList.contains('active') ? 'true' : 'false');
+    c.addEventListener('click', function(ev) {
+      if (touched === this) { touched = null; return; }
+      ev.preventDefault(); toggle(this);
+    });
+    c.addEventListener('touchstart', function() { touched = this; }, { passive: true });
+    c.addEventListener('touchend', function(ev) { ev.preventDefault(); toggle(this); }, { passive: false });
+    c.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(this); }
+    });
+  }
+})();
 
 // Arrival date default = today + 14 days
 (function defaultArrivalDate(){
@@ -430,6 +490,42 @@ document.querySelectorAll('#interests .chip').forEach(chip => {
   const day = String(d.getDate()).padStart(2,'0');
   document.getElementById('arrivalDate').value = `${y}-${m}-${day}`;
 })();
+
+// Budget range hint - converts CNY per-person per-day to selected currency
+// (Rough rates, for expectation-setting only)
+var CN_RATES = { USD:0.14, CNY:1, EUR:0.13, GBP:0.11, JPY:22, KRW:195, HKD:1.09, TWD:4.5, SGD:0.19, AUD:0.22, CAD:0.19, INR:11.7, RUB:13, BRL:0.69, MXN:2.4, AED:0.51, TRY:4.7 };
+var CN_SYMBOLS = { USD:"$", CNY:"¥", EUR:"€", GBP:"£", JPY:"¥", KRW:"₩", HKD:"HK$", TWD:"NT$", SGD:"S$", AUD:"A$", CAD:"C$", INR:"₹", RUB:"₽", BRL:"R$", MXN:"Mex$", AED:"د.إ", TRY:"₺" };
+var BUDGET_RANGES = {
+  "Backpacker (under ¥200/day)":              { low: 100, high: 300, en: "Hostels, street food, buses",                     zh: "青旅民宿、路边摊、公共交通" },
+  "Economy (¥200-500/day)":                    { low: 300, high: 600, en: "Budget hotel, local eats, metro + taxi",         zh: "经济酒店、本地餐饮、地铁打车搭配" },
+  "Comfort (¥500-1000/day)":                   { low: 600, high: 1200,en: "4★ hotel, nice restaurants, private transfers", zh: "四星酒店、餐厅正餐、舒适出行" },
+  "Luxury (over ¥1000/day)":                   { low: 1200, high: null,en: "5★ luxury, fine dining, private car",           zh: "五星奢华、精致餐饮、专属用车" }
+};
+function updateBudgetHint() {
+  var sel = document.getElementById("budget");
+  var opt = sel.options[sel.selectedIndex];
+  var key = opt.value;
+  var cur = document.getElementById("currency").value;
+  var r = CN_RATES[cur] || 1;
+  var b = BUDGET_RANGES[key];
+  if (!b) return;
+  var hint = document.getElementById("budgetHint");
+  if (!hint) return;
+  var lang = document.getElementById("language").value || "English";
+  var zh = lang.indexOf("中文") !== -1;
+  var sym = CN_SYMBOLS[cur] || "";
+  function fmt(n) { return sym + Math.round(n).toLocaleString(); }
+  var low = fmt(b.low * r);
+  var high = b.high ? fmt(b.high * r) : (zh ? "无上限" : "no cap");
+  var desc = zh ? b.zh : b.en;
+  var per = zh ? " /人/天" : " /person/day";
+  var prefix = zh ? "💰 大致预算区间：" : "💰 Estimated per-person per-day: ";
+  hint.innerHTML = prefix + "<strong>" + low + " – " + high + " " + cur + per + "</strong><br>🎯 " + desc;
+}
+document.getElementById("budget").addEventListener("change", updateBudgetHint);
+document.getElementById("currency").addEventListener("change", updateBudgetHint);
+document.getElementById("language").addEventListener("change", updateBudgetHint);
+updateBudgetHint();
 
 // Collect form data
 function collectFormData() {
