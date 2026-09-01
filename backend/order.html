@@ -612,9 +612,95 @@ if (new URLSearchParams(window.location.search).get('success') === 'true') {
       firstCity: formData.cities[0] || ''
     };
 
-    // Fire API call in background (fire-and-forget for email delivery)
-    // Step 1: 先向服务端申请一个 3 分钟一次性 generate_token（未付费用户无法直接拿 token，彻底堵住 API 漏洞）
-    fetch('/request-generate-token', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+
+    // ============================================================================
+    // Fix for Render Free 50s timeout: change to async dual-path
+    // Webhook handles real generation + email; frontend 'try once' with 45s timeout
+    // ============================================================================
+
+    sessionStorage.removeItem('orderFormData');
+
+    const REQUEST_TIMEOUT_MS = 45 * 1000;
+    const downloadSection = document.getElementById('downloadSection');
+    const downloadHint = document.getElementById('downloadHint');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const downloadBtnText = document.getElementById('downloadBtnText');
+
+    const loadingMsg = document.createElement('div');
+    loadingMsg.id = 'downloadLoadingMsg';
+    loadingMsg.style.cssText = 'font-size:0.85rem;color:#555;padding:14px;background:#fff8e1;border-radius:10px;margin-top:14px;line-height:1.6;';
+
+    function setLoadingText(html, bgColor) {
+      loadingMsg.innerHTML = html;
+      loadingMsg.style.background = bgColor || '#fff8e1';
+      if (!loadingMsg.parentNode) {
+        downloadSection.parentNode.insertBefore(loadingMsg, downloadSection);
+      }
+    }
+
+    function tryInstantGenerate() {
+      const isZh = lang === '中文（简体）';
+      setLoadingText(
+        isZh ? '⏳ 正在生成中，请稍候...（超时后会继续后台生成，确保邮件送达）'
+             : '⏳ Generating, please wait... (If it times out, it continues in background - email is guaranteed)',
+        '#e3f2fd'
+      );
+      downloadBtn.style.display = 'none';
+
+      fetch('/request-generate-token', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        .then(r => { if (!r.ok) throw new Error('get_token_fail'); return r.json(); })
+        .then(({ token }) => {
+          if (!token) throw new Error('empty_token');
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+          return fetch('/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preferences, format: 'doc', generate_token: token }),
+            signal: ctrl.signal
+          }).finally(() => clearTimeout(timer));
+        })
+        .then(async res => {
+          if (!res.ok) throw new Error('http_' + res.status);
+          const data = await res.json();
+          if (!data.docBase64) throw new Error('no_doc');
+
+          loadingMsg.remove();
+          downloadHint.textContent = t.downloadHint;
+          downloadBtnText.textContent = t.downloadBtn;
+          downloadBtn.style.display = 'inline-block';
+          downloadBtn.onclick = () => {
+            const binary = atob(data.docBase64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const blob = new Blob([bytes], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = data.fileName || 'travel-guide.doc';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          };
+        })
+        .catch(err => {
+          console.warn('Instant generate skipped (Render timeout expected):', err.message);
+          const isZh2 = lang === '中文（简体）';
+          const htm = isZh2
+            ? '<div style="margin-bottom:10px;color:#2e7d32;">✅ 支付成功！攻略正在后台生成，<strong>几分钟内会自动发到 ' + email + '</strong>。</div><div style="font-size:0.8rem;color:#666;">如 30 分钟没收到请检查垃圾邮件或联系客服。</div>'
+            : '<div style="margin-bottom:10px;color:#2e7d32;">✅ Payment received! Your guide is being generated and will arrive at <strong>' + email + '</strong> in a few minutes.</div><div style="font-size:0.8rem;color:#666;">Check spam folder if not received within 30 min.</div>';
+          setLoadingText(htm, '#e8f5e9');
+          const retryBtn = document.createElement('button');
+          retryBtn.textContent = isZh2 ? '🔄 再试一次即时下载' : '🔄 Try instant download again';
+          retryBtn.style.cssText = 'margin-top:12px;background:#1a1a1a;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;';
+          retryBtn.onclick = tryInstantGenerate;
+          loadingMsg.appendChild(retryBtn);
+        });
+    }
+
+    tryInstantGenerate();
+)
       .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed to obtain generate token')))
       .then(({ token }) => {
         if (!token) return Promise.reject(new Error('Empty generate token'));
