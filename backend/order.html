@@ -349,7 +349,7 @@ function openSimulatedCheckout(data) {
             Pay $9.90
           </button>
           <p style="font-size:0.75rem;color:#999;text-align:center;margin-top:0.75rem;">
-            This is a simulated checkout for testing. Real Paddle will appear when using overseas network.
+            Offline mode.
           </p>
         </div>
         <div id="simStep2" style="display:none;text-align:center;padding:2rem 0;">
@@ -381,7 +381,7 @@ function openSimulatedCheckout(data) {
       msg.textContent = '✅ 100% discount applied!';
       msg.style.color = '#2ecc71';
     } else {
-      msg.textContent = 'Invalid discount code. Try TEST100';
+      msg.textContent = 'Invalid discount code.';
       msg.style.color = '#e74c3c';
     }
   };
@@ -501,8 +501,25 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
   btn.disabled = false;
 
   if (!available) {
-    // Paddle blocked in this region — show simulated checkout
-    openSimulatedCheckout(data);
+    // Paddle blocked in this region
+    // Normal visitors: friendly msg only. Dev: URL ?dev=1 or localStorage simAdmin=true
+    const urlParams = new URLSearchParams(window.location.search);
+    const isDev = urlParams.get('dev') === '1' || localStorage.getItem('simAdmin') === 'true';
+    if (isDev) {
+      openSimulatedCheckout(data);
+    } else {
+      const overlay = document.createElement('div');
+      overlay.id = 'simCheckout';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(50,50,50,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;';
+      overlay.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:400px;width:90%;padding:1.5rem;text-align:center;font-family:-apple-system,sans-serif;">' +
+        '<div style="font-size:2.5rem;margin-bottom:.75rem;">🌍</div>' +
+        '<div style="font-weight:700;margin-bottom:.5rem;">Payment temporarily unavailable</div>' +
+        '<div style="font-size:.85rem;color:#666;line-height:1.5;margin-bottom:1rem;">Trouble connecting to our payment provider from your network.<br>Please try again later or contact us.</div>' +
+        '<div style="font-size:.82rem;color:#888;background:#f8f9fa;padding:.6rem;border-radius:6px;margin-bottom:1rem;">✉️ support@chinatravelguide.ai</div>' +
+        '<button onclick="document.getElementById(simCheckout).remove()" style="background:#1a1a1a;color:#fff;border:none;padding:.7rem 1.5rem;border-radius:8px;cursor:pointer;font-weight:600;">Close</button>' +
+        '</div>';
+      document.body.appendChild(overlay);
+    }
     return;
   }
 
