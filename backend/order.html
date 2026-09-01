@@ -189,8 +189,8 @@ textarea { resize: vertical; min-height: 60px; }
 
     <h2>④ Interests · 兴趣方向 <span class="hint">多选 / multi-select</span></h2>
     <div class="chips" id="interests">
-      <div class="chip active" data-value="Landmarks & UNESCO">🏛️ Landmarks</div>
-      <div class="chip active" data-value="Food & Street Food">🍜 Food</div>
+      <div class="chip" role="button" tabindex="0" data-value="Landmarks & UNESCO">🏛️ Landmarks</div>
+      <div class="chip" role="button" tabindex="0" data-value="Food & Street Food">🍜 Food</div>
       <div class="chip" role="button" tabindex="0" data-value="Photo Spots">📸 Photo Spots</div>
       <div class="chip" role="button" tabindex="0" data-value="Nature & Scenery">🏔️ Nature</div>
       <div class="chip" role="button" tabindex="0" data-value="Night Markets">🌙 Night Markets</div>
@@ -204,41 +204,7 @@ textarea { resize: vertical; min-height: 60px; }
     </div>
 
     <h2>⑤ Preferences · 偏好与备注</h2>
-    <div class="row">
-      <div class="fg">
-        <label>Guide Language · 攻略语言</label>
-        <select data-removed="duplicate" style="display:none!important">
-          <option value="English" selected>🇺🇸 English (US)</option>
-          <option value="English (UK)">🇬🇧 English (UK)</option>
-          <option value="English (AU)">🇦🇺 English (AU)</option>
-          <option value="English (CA)">🇨🇦 English (CA)</option>
-          <option value="中文">🇨🇳 中文（简体）</option>
-          <option value="中文(繁体)">🇹🇼 中文（繁體）</option>
-          <option value="日本語">🇯🇵 日本語</option>
-          <option value="한국어">🇰🇷 한국어</option>
-          <option value="Français">🇫🇷 Français</option>
-          <option value="Deutsch">🇩🇪 Deutsch</option>
-          <option value="Español">🇪🇸 Español</option>
-          <option value="Español (MX)">🇲🇽 Español (MX)</option>
-          <option value="Italiano">🇮🇹 Italiano</option>
-          <option value="Português">🇵🇹 Português</option>
-          <option value="Português (BR)">🇧🇷 Português (BR)</option>
-          <option value="Русский">🇷🇺 Русский</option>
-          <option value="ไทย">🇹🇭 ไทย</option>
-          <option value="Tiếng Việt">🇻🇳 Tiếng Việt</option>
-          <option value="Bahasa Indonesia">🇮🇩 Bahasa Indonesia</option>
-          <option value="Bahasa Melayu">🇲🇾 Bahasa Melayu</option>
-          <option value="Filipino">🇵🇭 Filipino</option>
-          <option value="हिन्दी">🇮🇳 हिन्दी</option>
-          <option value="العربية">🇦🇪 العربية</option>
-          <option value="Türkçe">🇹🇷 Türkçe</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label>Currency · 货币</label>
-        <select data-removed2="duplicate" style="display:none!important">
-      </div>
-    </div>
+    
     <div class="fg">
       <label>Dietary · 饮食要求 <span class="hint">选填 / optional</span></label>
       <input type="text" id="dietary" placeholder="e.g. Vegetarian, no pork, halal, no spicy">
@@ -493,38 +459,52 @@ function openSimulatedCheckout(data) {
 
 // Budget range hint - converts CNY per-person per-day to selected currency
 // (Rough rates, for expectation-setting only)
+// Budget estimate — combines daily/person range × travelers × days into TOTAL trip cost
+// Rates are rough, for expectation-setting only; base = CNY (China local)
 var CN_RATES = { USD:0.14, CNY:1, EUR:0.13, GBP:0.11, JPY:22, KRW:195, HKD:1.09, TWD:4.5, SGD:0.19, AUD:0.22, CAD:0.19, INR:11.7, RUB:13, BRL:0.69, MXN:2.4, AED:0.51, TRY:4.7 };
 var CN_SYMBOLS = { USD:"$", CNY:"¥", EUR:"€", GBP:"£", JPY:"¥", KRW:"₩", HKD:"HK$", TWD:"NT$", SGD:"S$", AUD:"A$", CAD:"C$", INR:"₹", RUB:"₽", BRL:"R$", MXN:"Mex$", AED:"د.إ", TRY:"₺" };
 var BUDGET_RANGES = {
-  "Backpacker (under ¥200/day)":              { low: 100, high: 300, en: "Hostels, street food, buses",                     zh: "青旅民宿、路边摊、公共交通" },
+  "Backpacker (under ¥200/day)":              { low: 100, high: 300, en: "Hostels, street food, city buses",                zh: "青旅民宿、路边摊、公交地铁" },
   "Economy (¥200-500/day)":                    { low: 300, high: 600, en: "Budget hotel, local eats, metro + taxi",         zh: "经济酒店、本地餐饮、地铁打车搭配" },
   "Comfort (¥500-1000/day)":                   { low: 600, high: 1200,en: "4★ hotel, nice restaurants, private transfers", zh: "四星酒店、餐厅正餐、舒适出行" },
   "Luxury (over ¥1000/day)":                   { low: 1200, high: null,en: "5★ luxury, fine dining, private car",           zh: "五星奢华、精致餐饮、专属用车" }
 };
+function _int(elId) { var el = document.getElementById(elId); var n = parseInt((el && el.value) || "", 10); return (isNaN(n) || n < 1) ? 1 : n; }
 function updateBudgetHint() {
   var sel = document.getElementById("budget");
   var opt = sel.options[sel.selectedIndex];
   var key = opt.value;
   var cur = document.getElementById("currency").value;
   var r = CN_RATES[cur] || 1;
-  var b = BUDGET_RANGES[key];
-  if (!b) return;
-  var hint = document.getElementById("budgetHint");
-  if (!hint) return;
+  var b = BUDGET_RANGES[key]; if (!b) return;
+  var hint = document.getElementById("budgetHint"); if (!hint) return;
   var lang = document.getElementById("language").value || "English";
   var zh = lang.indexOf("中文") !== -1;
   var sym = CN_SYMBOLS[cur] || "";
   function fmt(n) { return sym + Math.round(n).toLocaleString(); }
-  var low = fmt(b.low * r);
-  var high = b.high ? fmt(b.high * r) : (zh ? "无上限" : "no cap");
+  var travelers = _int("travelersCount");
+  var days      = _int("days");
+  var ppl = travelers, dayn = days;
+  var perDayLow  = b.low  * r * ppl;
+  var perDayHigh = b.high ? b.high * r * ppl : null;
+  var totalLow   = perDayLow  * dayn;
+  var totalHigh  = perDayHigh != null ? perDayHigh * dayn : null;
+  var perDayLowTxt  = fmt(perDayLow);
+  var perDayHighTxt = perDayHigh != null ? fmt(perDayHigh) : (zh ? "无上限" : "no cap");
+  var totalLowTxt   = fmt(totalLow);
+  var totalHighTxt  = totalHigh != null ? fmt(totalHigh) : (zh ? "无上限" : "no cap");
   var desc = zh ? b.zh : b.en;
-  var per = zh ? " /人/天" : " /person/day";
-  var prefix = zh ? "💰 大致预算区间：" : "💰 Estimated per-person per-day: ";
-  hint.innerHTML = prefix + "<strong>" + low + " – " + high + " " + cur + per + "</strong><br>🎯 " + desc;
+  var title = zh ? "📝 预估行程总预算" : "📝 Estimated total trip cost";
+  var spec  = zh ? "（按 " + travelers + " 人 × " + days + " 天）" : " (for " + travelers + " traveler(s) × " + days + " day(s))";
+  var totalLabel = zh ? "总预算：" : "Total budget  : ";
+  var perLabel   = zh ? "每日每人：" : "Per person/day: ";
+  var perLine = "<span style=\"opacity:.7;\">" + perLabel + perDayLowTxt + " – " + perDayHighTxt + " " + cur + "</span>";
+  var lineTotal = totalLabel + "<strong>" + totalLowTxt + " – " + totalHighTxt + " " + cur + "</strong>";
+  hint.innerHTML = "<div style=\"font-weight:600;margin-bottom:.25rem;\">" + title + spec + "</div>" + lineTotal + "<br>" + perLine + "<br>🎯 " + desc;
 }
-document.getElementById("budget").addEventListener("change", updateBudgetHint);
-document.getElementById("currency").addEventListener("change", updateBudgetHint);
-document.getElementById("language").addEventListener("change", updateBudgetHint);
+function _bhBind(id) { var el = document.getElementById(id); if (el) { el.addEventListener("change", updateBudgetHint); el.addEventListener("input",  updateBudgetHint); } }
+_bhBind("budget"); _bhBind("currency"); _bhBind("language");
+_bhBind("travelersCount"); _bhBind("days");
 updateBudgetHint();
 
 // Collect form data
@@ -812,8 +792,7 @@ if (new URLSearchParams(window.location.search).get('success') === 'true') {
         });
     }
 
-    tryInstantGenerate();
-)
+    tryInstantGenerate()
       .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed to obtain generate token')))
       .then(({ token }) => {
         if (!token) return Promise.reject(new Error('Empty generate token'));
