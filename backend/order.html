@@ -41,6 +41,7 @@ textarea { resize: vertical; min-height: 60px; }
 .error-msg { color: #c0392b; font-size: 0.9rem; margin-top: 0.5rem; }
 @media (max-width: 600px) { .row { flex-direction: column; gap: 0; } }
 </style>
+<script src="/paddle.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -290,38 +291,29 @@ async function ensurePaddle() {
   if (paddleAvailable === true) return true;
   if (paddleAvailable === false) return false;
 
-  // Load paddle SDK from local copy hosted on our server.
-  // Always works if the page loads (Render serves /paddle.js).
-  await new Promise((resolve) => {
-    if (document.getElementById("paddleScript")) return resolve();
-    const s = document.createElement("script");
-    s.id = "paddleScript";
-    s.src = "/paddle.js";
-    s.onload = function() {
-      console.log("[PADDLE] /paddle.js loaded OK ✓");
-      resolve();
-    };
-    s.onerror = function() {
-      console.error("[PADDLE] /paddle.js FAILED — fallback to CDN");
-      s.remove();
-      const s2 = document.createElement("script");
-      s2.id = "paddleScript";
-      s2.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
-      s2.onload = function() { console.log("[PADDLE] CDN loaded OK ✓"); resolve(); };
-      s2.onerror = function() { console.error("[PADDLE] CDN also failed ✗"); resolve(); };
-      document.head.appendChild(s2);
-    };
-    document.head.appendChild(s);
-  });
-
-  await new Promise(r => setTimeout(r, 500));
-
+  // /paddle.js is loaded STATICALLY in <head> — just check global object.
   var hasPaddle = typeof Paddle !== "undefined";
   var hasCheckout = hasPaddle && !!Paddle.Checkout;
-  console.log("[PADDLE] post-load: Paddle=" + hasPaddle + " Checkout=" + hasCheckout);
+  console.log("[PADDLE] static-load check: Paddle=" + hasPaddle + " Checkout=" + hasCheckout);
 
   if (!hasPaddle || !hasCheckout) {
-    console.error("[PADDLE] FAIL: SDK not available after script load");
+    // Static load missed — try dynamic CDN fallback
+    console.warn("[PADDLE] static load missed — dynamic CDN fallback");
+    await new Promise((resolve) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
+      s.onload = resolve;
+      s.onerror = resolve;
+      document.head.appendChild(s);
+    });
+    await new Promise(r => setTimeout(r, 500));
+    hasPaddle = typeof Paddle !== "undefined";
+    hasCheckout = hasPaddle && !!Paddle.Checkout;
+    console.log("[PADDLE] fallback check: Paddle=" + hasPaddle + " Checkout=" + hasCheckout);
+  }
+
+  if (!hasPaddle || !hasCheckout) {
+    console.error("[PADDLE] FAIL: SDK not available");
     paddleAvailable = false;
     return false;
   }
