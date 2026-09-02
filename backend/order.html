@@ -153,7 +153,6 @@ textarea { resize: vertical; min-height: 60px; }
           <option value="Comfort (¥500-1000/day)" data-cny-low="600" data-cny-high="1200">💴 Comfort · 舒适商务</option>
           <option value="Luxury (over ¥1000/day)" data-cny-low="1200" data-cny-high="9999">💎 Luxury · 奢华游</option>
         </select>
-        <div id="budgetHint" style="margin-top:.35rem;font-size:.78rem;color:#555;background:#f8f9fa;padding:.4rem .6rem;border-radius:6px;line-height:1.5;"></div>
       </div>
     </div>
     <div class="row">
@@ -214,6 +213,8 @@ textarea { resize: vertical; min-height: 60px; }
       <textarea id="notes" placeholder="e.g. traveling with seniors, must see Giant Panda, wheelchair access"></textarea>
     </div>
 
+    <div id="budgetHint" style="margin-top:1rem;padding:1rem 1.2rem;background:#f8f9fa;border-radius:10px;border:1px solid #e0e0e0;"></div>
+
     <button class="btn" id="buyBtn">Buy Now — $9.9</button>
     <div class="error-msg" id="formError"></div>
   </div>
@@ -261,6 +262,28 @@ textarea { resize: vertical; min-height: 60px; }
 
 <!-- Paddle SDK 延迟加载，不在页面加载时初始化（避免 Paddle SDK 在国内网络下弹出错误页） -->
 <script>
+// Auto-detect user language from IP geolocation / browser locale
+(function autoDetectLang(){
+  var lang = document.getElementById("language");
+  if (!lang) return;
+  // 1. Immediate: browser locale
+  var bl = (navigator.language || navigator.userLanguage || "").toLowerCase();
+  lang.value = bl.indexOf("zh") === 0 ? "中文" : "English";
+  // 2. Async: IP geo API override (tries 2 APIs, falls back to browser locale)
+  function setLang(code) {
+    var v = (["CN","TW","HK","MO"].indexOf(code) >= 0) ? "中文" : "English";
+    if (lang.value !== v) { lang.value = v; if (lang.dispatchEvent) lang.dispatchEvent(new Event("change")); }
+  }
+  fetch("https://ipinfo.io/json").then(function(r){return r.json();}).then(function(d){
+    if (d && d.country) setLang(d.country);
+  }).catch(function(){
+    fetch("https://ipapi.co/json/").then(function(r){return r.json();}).then(function(d){
+      if (d && d.country_code) setLang(d.country_code);
+    }).catch(function(){});
+  });
+})();
+
+
 let paddleAvailable = null; // null = 未检测，true/false = 已检测
 
 async function ensurePaddle() {
@@ -457,55 +480,117 @@ function openSimulatedCheckout(data) {
   document.getElementById('arrivalDate').value = `${y}-${m}-${day}`;
 })();
 
-// Budget range hint - converts CNY per-person per-day to selected currency
-// (Rough rates, for expectation-setting only)
-// Budget estimate — combines daily/person range × travelers × days into TOTAL trip cost
-// Rates are rough, for expectation-setting only; base = CNY (China local)
+// Itemized budget estimate — separates accommodation, food, transport, activities
+// Accommodation: per-room-per-night (rooms = ceil(travelers/2))
+// Food & Activities: per-person-per-day
+// Transport: per-day (not per-person, since taxi/car is shared)
+// All base prices in CNY, converted to selected currency
 var CN_RATES = { USD:0.14, CNY:1, EUR:0.13, GBP:0.11, JPY:22, KRW:195, HKD:1.09, TWD:4.5, SGD:0.19, AUD:0.22, CAD:0.19, INR:11.7, RUB:13, BRL:0.69, MXN:2.4, AED:0.51, TRY:4.7 };
 var CN_SYMBOLS = { USD:"$", CNY:"¥", EUR:"€", GBP:"£", JPY:"¥", KRW:"₩", HKD:"HK$", TWD:"NT$", SGD:"S$", AUD:"A$", CAD:"C$", INR:"₹", RUB:"₽", BRL:"R$", MXN:"Mex$", AED:"د.إ", TRY:"₺" };
-var BUDGET_RANGES = {
-  "Backpacker (under ¥200/day)":              { low: 100, high: 300, en: "Hostels, street food, city buses",                zh: "青旅民宿、路边摊、公交地铁" },
-  "Economy (¥200-500/day)":                    { low: 300, high: 600, en: "Budget hotel, local eats, metro + taxi",         zh: "经济酒店、本地餐饮、地铁打车搭配" },
-  "Comfort (¥500-1000/day)":                   { low: 600, high: 1200,en: "4★ hotel, nice restaurants, private transfers", zh: "四星酒店、餐厅正餐、舒适出行" },
-  "Luxury (over ¥1000/day)":                   { low: 1200, high: null,en: "5★ luxury, fine dining, private car",           zh: "五星奢华、精致餐饮、专属用车" }
+
+// Per-room-per-night accommodation cost (CNY) by hotel preference
+var HOTEL_COSTS = {
+  "Budget hostels & guesthouses (under $50)": 100,
+  "Balanced (mix)": 300,
+  "3-4★ business hotels ($50-150)": 500,
+  "5★ luxury & heritage ($200+)": 1200,
+  "Boutique & design hotels": 600
 };
-function _int(elId) { var el = document.getElementById(elId); var n = parseInt((el && el.value) || "", 10); return (isNaN(n) || n < 1) ? 1 : n; }
-function updateBudgetHint() {
-  var sel = document.getElementById("budget");
-  var opt = sel.options[sel.selectedIndex];
-  var key = opt.value;
-  var cur = document.getElementById("currency").value;
-  var r = CN_RATES[cur] || 1;
-  var b = BUDGET_RANGES[key]; if (!b) return;
-  var hint = document.getElementById("budgetHint"); if (!hint) return;
-  var lang = document.getElementById("language").value || "English";
-  var zh = lang.indexOf("中文") !== -1;
-  var sym = CN_SYMBOLS[cur] || "";
-  function fmt(n) { return sym + Math.round(n).toLocaleString(); }
-  var travelers = _int("travelersCount");
-  var days      = _int("days");
-  var ppl = travelers, dayn = days;
-  var perDayLow  = b.low  * r * ppl;
-  var perDayHigh = b.high ? b.high * r * ppl : null;
-  var totalLow   = perDayLow  * dayn;
-  var totalHigh  = perDayHigh != null ? perDayHigh * dayn : null;
-  var perDayLowTxt  = fmt(perDayLow);
-  var perDayHighTxt = perDayHigh != null ? fmt(perDayHigh) : (zh ? "无上限" : "no cap");
-  var totalLowTxt   = fmt(totalLow);
-  var totalHighTxt  = totalHigh != null ? fmt(totalHigh) : (zh ? "无上限" : "no cap");
-  var desc = zh ? b.zh : b.en;
-  var title = zh ? "📝 预估行程总预算" : "📝 Estimated total trip cost";
-  var spec  = zh ? "（按 " + travelers + " 人 × " + days + " 天）" : " (for " + travelers + " traveler(s) × " + days + " day(s))";
-  var totalLabel = zh ? "总预算：" : "Total budget  : ";
-  var perLabel   = zh ? "每日每人：" : "Per person/day: ";
-  var perLine = "<span style=\"opacity:.7;\">" + perLabel + perDayLowTxt + " – " + perDayHighTxt + " " + cur + "</span>";
-  var lineTotal = totalLabel + "<strong>" + totalLowTxt + " – " + totalHighTxt + " " + cur + "</strong>";
-  hint.innerHTML = "<div style=\"font-weight:600;margin-bottom:.25rem;\">" + title + spec + "</div>" + lineTotal + "<br>" + perLine + "<br>🎯 " + desc;
+// Per-person-per-day food cost (CNY) by budget tier
+var FOOD_COSTS = {
+  "Backpacker (under ¥200/day)": 50,
+  "Economy (¥200-500/day)": 80,
+  "Comfort (¥500-1000/day)": 150,
+  "Luxury (over ¥1000/day)": 400
+};
+// Per-day transport cost (CNY, shared not per-person) by transport preference
+var TRANSPORT_COSTS = {
+  "Public transit only (metro / bus)": 30,
+  "Balanced (metro + taxi + high-speed rail)": 80,
+  "Taxi / DiDi preferred (max convenience)": 200,
+  "High-speed rail for every city-hop": 150,
+  "Flight for long-haul city-hop": 500
+};
+// Per-person-per-day activity/ticket cost (CNY) by budget tier
+var ACTIVITY_COSTS = {
+  "Backpacker (under ¥200/day)": 20,
+  "Economy (¥200-500/day)": 50,
+  "Comfort (¥500-1000/day)": 80,
+  "Luxury (over ¥1000/day)": 200
+};
+
+function _int(elId) {
+  var el = document.getElementById(elId);
+  var n = parseInt((el && el.value) || "", 10);
+  return (isNaN(n) || n < 1) ? 1 : n;
 }
-function _bhBind(id) { var el = document.getElementById(id); if (el) { el.addEventListener("change", updateBudgetHint); el.addEventListener("input",  updateBudgetHint); } }
+// Parse travelers select value: "1" -> 1, "3-4" -> 3, "5-8" -> 5, "9+" -> 9
+function _travelers() {
+  var el = document.getElementById("travelers");
+  if (!el || !el.value) return 1;
+  var m = el.value.match(/\d+/);
+  return m ? parseInt(m[0], 10) : 1;
+}
+
+function updateBudgetHint() {
+  var budget = document.getElementById("budget");
+  var bKey = budget.options[budget.selectedIndex].value;
+  var hotel = document.getElementById("hotelPref").value;
+  var transport = document.getElementById("transportPref").value;
+  var cur = document.getElementById("currency").value;
+  var lang = document.getElementById("language").value || "English";
+  var hint = document.getElementById("budgetHint");
+  if (!hint) return;
+  var r = CN_RATES[cur] || 1;
+  var sym = CN_SYMBOLS[cur] || "";
+  var zh = lang.indexOf("中文") !== -1;
+  function fmt(n) { return sym + Math.round(n).toLocaleString(); }
+  var ppl = _travelers();
+  var days = _int("days");
+  var rooms = Math.ceil(ppl / 2);
+  // Itemized costs (CNY base -> convert to selected currency)
+  var hotelCost = (HOTEL_COSTS[hotel] || 300) * rooms * days * r;
+  var foodCost = (FOOD_COSTS[bKey] || 80) * ppl * days * r;
+  var transportCost = (TRANSPORT_COSTS[transport] || 80) * days * r;
+  var activityCost = (ACTIVITY_COSTS[bKey] || 50) * ppl * days * r;
+  var total = hotelCost + foodCost + transportCost + activityCost;
+  // Labels (bilingual)
+  var titleH = zh ? "📊 预估行程总预算" : "📊 Estimated Trip Budget";
+  var specH = zh ? "（按 " + ppl + " 人 × " + days + " 天）" : " (" + ppl + " traveler(s) × " + days + " day(s))";
+  var hotelL = zh ? "🏨 住宿" : "🏨 Accommodation";
+  var foodL = zh ? "🍜 餐饮" : "🍜 Food & Dining";
+  var transL = zh ? "🚗 交通" : "🚗 Transportation";
+  var actL = zh ? "🎥 门票活动" : "🎥 Activities";
+  var totalL = zh ? "💰 总计" : "💰 Total";
+  var roomNote = zh ? rooms + " 间 × " + days + " 晚" : rooms + " room(s) × " + days + " night(s)";
+  var foodNote = zh ? ppl + " 人 × " + days + " 天" : ppl + " ppl × " + days + " day(s)";
+  var transNote = zh ? days + " 天" : days + " day(s)";
+  var actNote = foodNote;
+  var dash = "────────────────────────";
+  function row(label, note, cost) {
+    return "<div style=\"display:flex;justify-content:space-between;align-items:baseline;padding:.18rem 0;\">" +
+      "<span>" + label + " <span style=\"opacity:.5;font-size:.68rem;\">(" + note + ")</span></span>" +
+      "<strong>" + fmt(cost) + " " + cur + "</strong></div>";
+  }
+  hint.innerHTML =
+    "<div style=\"font-weight:700;font-size:.95rem;margin-bottom:.4rem;\">" + titleH + specH + "</div>" +
+    row(hotelL, roomNote, hotelCost) +
+    row(foodL, foodNote, foodCost) +
+    row(transL, transNote, transportCost) +
+    row(actL, actNote, activityCost) +
+    "<div style=\"opacity:.3;font-size:.7rem;margin:.15rem 0;\">" + dash + "</div>" +
+    "<div style=\"display:flex;justify-content:space-between;padding:.25rem 0;font-weight:700;font-size:1.05rem;color:#c0392b;\">" +
+      "<span>" + totalL + "</span><span>" + fmt(total) + " " + cur + "</span></div>";
+}
+function _bhBind(id) {
+  var el = document.getElementById(id);
+  if (el) { el.addEventListener("change", updateBudgetHint); el.addEventListener("input", updateBudgetHint); }
+}
 _bhBind("budget"); _bhBind("currency"); _bhBind("language");
-_bhBind("travelersCount"); _bhBind("days");
+_bhBind("travelers"); _bhBind("days");
+_bhBind("hotelPref"); _bhBind("transportPref");
 updateBudgetHint();
+
 
 // Collect form data
 function collectFormData() {
