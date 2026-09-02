@@ -703,18 +703,33 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
   }
 
   // Use HOSTED checkout — top-level browser navigation, GUARANTEED to go through user proxy (DNS included)
-  // Paddle v2 hosted URL: https://live.paddle.com/checkout/?priceId=XXX&email=XXX&...
-  var hostedUrl = 'https://live.paddle.com/checkout/?' +
-    'priceId=pri_01m0h0hs1axtqq0fzssmk99qm1' +
-    '&email=' + encodeURIComponent(data.email) +
-    '&customData[orderId]=' + encodeURIComponent(orderId) +
-    '&customData[preferences]=' + encodeURIComponent(JSON.stringify(data)) +
-    '&customer[email]=' + encodeURIComponent(data.email) +
-    '&settings[successUrl]=' + encodeURIComponent(window.location.origin + '/order?success=true') +
-    '&settings[themeMode]=light';
-  console.log('[PADDLE] Hosted checkout URL:', hostedUrl);
-  var diag = document.getElementById('paddleDiag');
-  if (diag) diag.textContent += '\n[PADDLE] Navigating to hosted checkout...';
+  // Paddle v2 hosted URL: https:  // ===== PADDLE V2 HOSTED CHECKOUT — SDK-EXACT FORMULA =====
+  // Built from paddle.js SDK (production):
+  // URL = "https://buy.paddle.com/paddlejs/v2?source_page=...#payload="
+  //        + encodeURIComponent(btoa(encodeURIComponent(snake_case(JSON))))
+  // buy.paddle.com is reachable via proxy in China; top-level nav bypasses iframe DNS issues.
+  var __sourcePage = window.location.href.split("#")[0];
+  var __toSnake = function(s) { return s.split(/(?=[A-Z])/).join("_").toLowerCase(); };
+  var __snakeKeys = function(o) {
+    if (Array.isArray(o)) return o.map(__snakeKeys);
+    if (o && typeof o === "object") {
+      var r = {};
+      for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) r[__toSnake(k)] = __snakeKeys(o[k]);
+      return r;
+    }
+    return o;
+  };
+  var __payload = __snakeKeys({
+    items: [{ priceId: "pri_01m0h0hs1axtqq0fzssmk99qm1", quantity: 1 }],
+    customData: { email: data.email, orderId: orderId, preferences: JSON.stringify(data) },
+    customer: { email: data.email },
+    settings: { sourcePage: __sourcePage, successUrl: window.location.origin + "/order?success=true", themeMode: "light" },
+    "paddlejs-version": "2.9.4",
+    checkoutInitiated: Date.now()
+  });
+  var __enc = encodeURIComponent(window.btoa(encodeURIComponent(JSON.stringify(__payload))));
+  var hostedUrl = "https://buy.paddle.com/paddlejs/v2?source_page=" + encodeURIComponent(__sourcePage) + "#payload=" + __enc;
+  console.log("[PADDLE] Hosted URL:", hostedUrl.substring(0, 100) + "...");
   window.location.href = hostedUrl;
 });
 
