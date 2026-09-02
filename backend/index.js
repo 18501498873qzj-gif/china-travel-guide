@@ -739,6 +739,123 @@ if (require.main === module) {
         res.end(JSON.stringify(result, null, 2));
         return;
       }
+      // Cache-Control no-cache (彻底防止浏览器缓存旧代码)
+      if (req.method === 'GET' && (req.url.startsWith('/order') || req.url === '/' || req.url === '/index.html')) {
+        // handle below
+      }
+      var isHtmlAsset = req.method === 'GET' && (req.url.endsWith('.html') || req.url.startsWith('/order'));
+      if (isHtmlAsset) {
+        // defer to original handlers but note header — we'll wrap them below... actually simplest: add to existing handlers
+      }
+
+      // ==== Paddle proxy test endpoint: 从 Render 服务器直连 Paddle 探测（不依赖用户代理）====
+      if (req.method === 'GET' && req.url.startsWith('/paddle-proxy-test')) {
+        try {
+          const urlObj = new URL(req.url, 'http://localhost');
+          const mode = urlObj.searchParams.get('mode') || 'checkout';
+          const testUrl = mode === 'cdn'
+            ? 'https://cdn.paddle.com/paddle/v2/assets/css/paddle.min.css'
+            : 'https://buy.paddle.com';
+          console.log('[PADDLE PROXY TEST] probing:', testUrl);
+          const u = new URL(testUrl);
+          const pr = https.request({
+            hostname: u.hostname, port: 443, path: u.pathname, method: 'HEAD',
+            headers: { 'User-Agent': 'ProxyTest/1.0' },
+            timeout: 8000
+          }, function(r) {
+            const body = {
+              ok: r.statusCode >= 200 && r.statusCode < 400,
+              statusCode: r.statusCode,
+              headers: {
+                'content-type': r.headers['content-type'],
+                'content-length': r.headers['content-length'],
+                'server': r.headers['server'],
+                'location': r.headers['location']
+              },
+              host: u.hostname,
+              mode: mode
+            };
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+            res.end(JSON.stringify(body, null, 2));
+          });
+          pr.on('timeout', () => { pr.destroy(); res.writeHead(504, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ ok:false, error:'timeout (8s)', host:u.hostname }, null, 2)); });
+          pr.on('error', e => { res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ ok:false, error:e.message, host:u.hostname }, null, 2)); });
+          pr.end();
+        } catch(e) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ok:false, error:e.message})); }
+        return;
+      }
+
+      // ==== Paddle 反向代理 — 绕过国内 DNS 污染 / 用户代理配置不一致 ====
+      // 用户永远访问我们自己的 Render（海外）服务器，服务器直连 Paddle
+      if (req.method === 'GET' && req.url.startsWith('/paddle-checkout')) {
+        try {
+          // Extract path after /paddle-checkout — preserve EXACTLY what's there
+          var rest = req.url.substring('/paddle-checkout'.length);
+          if (!rest || rest.charAt(0) !== '/') rest = '/' + rest;
+          var target = 'https://buy.paddle.com' + rest;
+          // Also handle /paddle-checkout?paddlejs/v2?xxx#yyy style (some browsers encode differently)
+          if (rest.substring(0, 8) === '//buy.paddle.com') target = 'https:' + rest.substring(1);
+          console.log('[PADDLE PROXY] →', target.substring(0, 120));
+
+          var u = new URL(target);
+          var opts = {
+            hostname: u.hostname,
+            port: 443,
+            path: u.pathname + u.search + u.hash,
+            method: 'GET',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; PaddleProxy/1.0; +chinatravelguide.ai)',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9'
+            },
+            timeout: 30000
+          };
+
+          var proxyReq = https.request(opts, function(proxyRes) {
+            // Forward status + headers but fix any absolute redirect Location headers
+            var headers = {};
+            for (var h in proxyRes.headers) {
+              headers[h] = proxyRes.headers[h];
+            }
+            // Fix absolute Location: redirects to our proxy path so user stays on our domain
+            if (headers['location']) {
+              var loc = headers['location'];
+              if (loc.startsWith('https://buy.paddle.com/')) {
+                headers['location'] = '/paddle-checkout' + loc.substring('https://buy.paddle.com'.length);
+                console.log('[PADDLE PROXY] Rewrote Location:', loc, '→', headers['location']);
+              }
+            }
+            // Strip Content-Security-Policy to avoid iframe issues
+            if (headers['content-security-policy']) delete headers['content-security-policy'];
+            if (headers['content-security-policy-report-only']) delete headers['content-security-policy-report-only'];
+            // Forward Content-Length if present, else remove (chunked is fine)
+            if (!headers['content-length'] && !proxyRes.headers['transfer-encoding']) {
+              // ok, default to chunked
+            }
+            res.writeHead(proxyRes.statusCode, headers);
+            console.log('[PADDLE PROXY] ✓', proxyRes.statusCode);
+            proxyRes.pipe(res);
+          });
+
+          proxyReq.on('timeout', function() {
+            proxyReq.destroy();
+            res.writeHead(504, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end('<html><body style="padding:2rem;font-family:sans-serif"><h2>⏱️ 连接 Paddle 超时</h2><p>请稍后重试，或邮件 support@chinatravelguide.ai</p></body></html>');
+          });
+          proxyReq.on('error', function(err) {
+            console.error('[PADDLE PROXY] ✗ error:', err.message);
+            res.writeHead(502, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end('<html><body style="padding:2rem;font-family:sans-serif"><h2>🌍 支付服务暂时不可用</h2><p>Paddle 连接失败：' + err.message + '</p><p>邮件联系 support@chinatravelguide.ai</p></body></html>');
+          });
+          proxyReq.end();
+        } catch (err) {
+          console.error('[PADDLE PROXY] catch:', err.message);
+          res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end('<html><body style="padding:2rem;font-family:sans-serif"><h2>错误</h2><p>' + err.message + '</p></body></html>');
+        }
+        return;
+      }
+
       // Paddle SDK 本地托管（避免 CDN 在国内被 DNS 污染）
       if (req.url === '/paddle.js' || req.url === '/v2/paddle.js') {
         try {
@@ -789,7 +906,7 @@ if (require.main === module) {
       if (req.url === '/order' || req.url === '/order.html' || req.url.startsWith('/order?')) {
         try {
           const html = fs.readFileSync(path.join(__dirname, 'order.html'), 'utf-8');
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, no-cache, must-revalidate', });
           res.end(html);
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });

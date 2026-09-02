@@ -762,11 +762,13 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
   var __outerEnc = encodeURIComponent(__b64);
 
   // Step G: Build URL + append query params EXACTLY like SDK Z()
-  var __url = "https://buy.paddle.com/paddlejs/v2" +
+    var __url = "/paddle-checkout" +
+    "/paddlejs/v2" +
     "?source_page=" + encodeURIComponent(__srcPage) +
     "#payload=" + __outerEnc +
     "&display_mode=inline" +
     "&apple_pay_enabled=0" +
+    "&retain_enabled=0"; +
     "&retain_enabled=0";
 
   console.log("[PADDLE] SDK-EXACT URL built:", __url.substring(0, 120) + "...");
