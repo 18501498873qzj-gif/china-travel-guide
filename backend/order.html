@@ -297,7 +297,7 @@ async function ensurePaddle() {
   var log = function(msg) { diag.textContent += "\n" + msg; console.log(msg); };
 
   if (paddleAvailable === true) { log("[PADDLE] already cached=true"); return true; }
-  if (paddleAvailable === false) { log("[PADDLE] already cached=false"); return false; }
+  // Don't cache false — user should be able to retry
 
   log("[PADDLE] Step 1: static <script src=/paddle.js> check");
   var hasP = typeof Paddle !== "undefined";
