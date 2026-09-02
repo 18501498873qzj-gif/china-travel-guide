@@ -290,49 +290,49 @@ async function ensurePaddle() {
   if (paddleAvailable === true) return true;
   if (paddleAvailable === false) return false;
 
-  // 动态加载 paddle.js
+  // Load paddle SDK: try Paddle CDN first (works with proxy/VPN),
+  // fallback to our local copy (works in China without proxy).
   await new Promise((resolve) => {
-    if (document.getElementById('paddleScript')) return resolve();
-    const s = document.createElement('script');
-    s.id = 'paddleScript';
-    s.src = '/paddle.js';
+    if (document.getElementById("paddleScript")) return resolve();
+    const s = document.createElement("script");
+    s.id = "paddleScript";
+    s.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
     s.onload = resolve;
-    s.onerror = resolve; // 加载失败继续
+    s.onerror = function() {
+      s.remove();
+      const s2 = document.createElement("script");
+      s2.id = "paddleScript";
+      s2.src = "/paddle.js";
+      s2.onload = resolve;
+      s2.onerror = resolve;
+      document.head.appendChild(s2);
+    };
     document.head.appendChild(s);
   });
 
-  // 等脚本执行完
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise(r => setTimeout(r, 400));
 
-  if (typeof Paddle === 'undefined' || !Paddle.Checkout) {
+  if (typeof Paddle === "undefined" || !Paddle.Checkout) {
     paddleAvailable = false;
     return false;
   }
 
-  // 尝试初始化（会连接 live.paddle.com 验证 token）
+  // Paddle v2 Initialize() is SYNC - no network test here.
+  // Actual connectivity is handled later by Checkout.open() itself.
   try {
-    const initPromise = new Promise((resolve, reject) => {
-      Paddle.Environment.set('live');
-      Paddle.Initialize({
-        token: 'live_8de9d646e470503d57b4c3cdc60',
-        onUpdate: () => {},
-        onCheckoutClose: () => {}
-      });
-      // Paddle 初始化成功回调
-      if (Paddle.Checkout) resolve(true);
-      else setTimeout(() => resolve(true), 500);
+    Paddle.Environment.set("live");
+    Paddle.Initialize({
+      token: "live_8de9d646e470503d57b4c3cdc60",
+      onUpdate: function() {},
+      onCheckoutClose: function() {}
     });
-
-    const timeout = new Promise((resolve) => setTimeout(() => resolve(false), 3000));
-    const result = await Promise.race([initPromise, timeout]);
-    paddleAvailable = result;
-    return result;
+    paddleAvailable = true;
+    return true;
   } catch(e) {
     paddleAvailable = false;
     return false;
   }
 }
-
 // Simulated Paddle Checkout (for regions where Paddle is blocked)
 function openSimulatedCheckout(data) {
   const overlay = document.createElement('div');
