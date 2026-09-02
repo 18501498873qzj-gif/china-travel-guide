@@ -340,8 +340,6 @@ async function ensurePaddle() {
     Paddle.Environment.set("live");
     Paddle.Initialize({
       token: "live_8de9d646e470503d57b4c3cdc60",
-      onUpdate: function() {},
-      onCheckoutClose: function() {}
     });
     log("[PADDLE] Initialize() OK ✓");
     paddleAvailable = true;
