@@ -702,25 +702,17 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
     return;
   }
 
-  // Use HOSTED checkout — top-level browser navigation, GUARANTEED to go through user proxy (DNS included)
-  // Paddle v2 hosted URL: https:  // ===== PADDLE V2 HOSTED CHECKOUT — SDK-EXACT FORMULA =====
-  // Built from paddle.js SDK (production):
-  // URL = "https://buy.paddle.com/paddlejs/v2?source_page=...#payload="
-  //        + encodeURIComponent(btoa(encodeURIComponent(snake_case(JSON))))
-  // buy.paddle.com is reachable via proxy in China; top-level nav bypasses iframe DNS issues.
-  var __sourcePage = window.location.href.split("#")[0];
-var __payload = {
+  // Use Paddle SDK directly — let SDK handle URL construction + encoding
+  // This GUARANTEES payload format matches what buy.paddle.com expects
+  Paddle.Checkout.open({
     items: [{ priceId: "pri_01m0h0hs1axtqq0fzssmk99qm1", quantity: 1 }],
-    customData: { email: data.email, orderId: orderId, preferences: JSON.stringify(data) },
     customer: { email: data.email },
-    settings: { sourcePage: __sourcePage, successUrl: window.location.origin + "/order?success=true", themeMode: "light" },
-    "paddlejs-version": "2.9.4",
-    checkoutInitiated: Date.now()
-  };
-  var __enc = encodeURIComponent(window.btoa(encodeURIComponent(JSON.stringify(__payload))));
-  var hostedUrl = "https://buy.paddle.com/paddlejs/v2?source_page=" + encodeURIComponent(__sourcePage) + "#payload=" + __enc;
-  console.log("[PADDLE] Hosted URL:", hostedUrl.substring(0, 100) + "...");
-  window.location.href = hostedUrl;
+    customData: { email: data.email, orderId: orderId },
+    settings: {
+      successUrl: window.location.origin + "/order?success=true",
+      themeMode: "light"
+    }
+  });
 });
 
 // ---- Multi-language success messages ----
