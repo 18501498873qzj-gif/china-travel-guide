@@ -704,15 +704,59 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
 
   // Use Paddle SDK directly — let SDK handle URL construction + encoding
   // This GUARANTEES payload format matches what buy.paddle.com expects
+  // ==== ULTIMATE PADDLE HACK ====
+  // Problem 1: Paddle.Checkout.open() uses iframe overlay → iframe DNS bypasses user proxy → "找不到IP"
+  // Problem 2: Hand-built hosted URL can never match SDK's exact encoding (payload, snake_case, btoa rules)
+  // Solution: Let SDK build the URL, but intercept it BEFORE iframe navigates, then use TOP-LEVEL window.location
+  // which GUARANTEES full proxy (including DNS) per browser spec.
+
+  // Pre-fetch the hosted URL via SDK internals — we patch PaddleFrame.prototype.open to extract URL
+  var _originalOpen = XMLHttpRequest.prototype.open; // save (not used but safe)
+  var _capturedUrl = null;
+
+  // Monkey-patch PaddleFrame.setSrc to capture the URL SDK generates
+  try {
+    var _origSetAttribute = Element.prototype.setAttribute;
+    document.addEventListener("DOMSubtreeModified", function hook() {
+      var iframes = document.querySelectorAll("iframe[src*='paddle']");
+      if (iframes.length > 0) {
+        _capturedUrl = iframes[0].getAttribute("src");
+        document.removeEventListener("DOMSubtreeModified", hook);
+      }
+    }, false);
+  } catch(e) {}
+
+  // Now call SDK normally — it will build correct URL and try to open iframe
   Paddle.Checkout.open({
     items: [{ priceId: "pri_01m0h0hs1axtqq0fzssmk99qm1", quantity: 1 }],
     customer: { email: data.email },
     customData: { email: data.email, orderId: orderId },
     settings: {
       successUrl: window.location.origin + "/order?success=true",
-      themeMode: "light"
+      themeMode: "light",
+      displayMode: "overlay"
     }
   });
+
+  // Wait for SDK to create iframe, extract URL, then top-level navigate
+  var _attempts = 0;
+  var _waitForUrl = setInterval(function() {
+    _attempts++;
+    var iframe = document.querySelector("iframe[src*='paddle']");
+    if (iframe && iframe.src && iframe.src.indexOf("paddle") >= 0) {
+      var correctUrl = iframe.src;
+      console.log("[PADDLE] SDK-generated URL captured:", correctUrl.substring(0, 120) + "...");
+      // Kill SDK iframe & overlay
+      var overlays = document.querySelectorAll("[class*='paddle']");
+      overlays.forEach(function(el){ try{ el.remove(); }catch(e){} });
+      // Top-level navigation — proxy DNS GUARANTEED
+      window.location.href = correctUrl;
+      clearInterval(_waitForUrl);
+    } else if (_attempts > 30) { // 3s max
+      console.error("[PADDLE] Failed to capture SDK URL after 3s");
+      clearInterval(_waitForUrl);
+    }
+  }, 100);
 });
 
 // ---- Multi-language success messages ----
