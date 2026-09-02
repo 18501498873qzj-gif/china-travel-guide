@@ -288,48 +288,67 @@ textarea { resize: vertical; min-height: 60px; }
 let paddleAvailable = null; // null = 未检测，true/false = 已检测
 
 async function ensurePaddle() {
-  if (paddleAvailable === true) return true;
-  if (paddleAvailable === false) return false;
+  // Add floating diagnostic div so user sees everything
+  var diag = document.createElement("div");
+  diag.id = "paddleDiag";
+  diag.style.cssText = "position:fixed;bottom:10px;right:10px;max-width:340px;background:#1a1a1a;color:#fff;font-family:monospace;font-size:11px;padding:10px;border-radius:8px;z-index:10000;white-space:pre-wrap;line-height:1.5;box-shadow:0 4px 20px rgba(0,0,0,.3);max-height:50vh;overflow-y:auto;";
+  diag.textContent = "[PADDLE] checking...";
+  document.body.appendChild(diag);
+  var log = function(msg) { diag.textContent += "\n" + msg; console.log(msg); };
 
-  // /paddle.js is loaded STATICALLY in <head> — just check global object.
-  var hasPaddle = typeof Paddle !== "undefined";
-  var hasCheckout = hasPaddle && !!Paddle.Checkout;
-  console.log("[PADDLE] static-load check: Paddle=" + hasPaddle + " Checkout=" + hasCheckout);
+  if (paddleAvailable === true) { log("[PADDLE] already cached=true"); return true; }
+  if (paddleAvailable === false) { log("[PADDLE] already cached=false"); return false; }
 
-  if (!hasPaddle || !hasCheckout) {
-    // Static load missed — try dynamic CDN fallback
-    console.warn("[PADDLE] static load missed — dynamic CDN fallback");
-    await new Promise((resolve) => {
-      const s = document.createElement("script");
-      s.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
-      s.onload = resolve;
-      s.onerror = resolve;
+  log("[PADDLE] Step 1: static <script src=/paddle.js> check");
+  var hasP = typeof Paddle !== "undefined";
+  var hasC = hasP && !!Paddle.Checkout;
+  log("[PADDLE]   window.Paddle exists = " + hasP);
+  log("[PADDLE]   Paddle.Checkout exists = " + hasC);
+  log("[PADDLE]   window.exports = " + typeof window.exports);
+  log("[PADDLE]   window.module = " + typeof window.module);
+
+  // If static load missed, try dynamic
+  if (!hasP || !hasC) {
+    log("[PADDLE] Static missed — dynamic /paddle.js fallback");
+    await new Promise(function(resolve) {
+      var s = document.createElement("script"); s.src = "/paddle.js";
+      s.onload = function(){ log("[PADDLE]   dynamic /paddle.js loaded OK"); resolve(); };
+      s.onerror = function(){
+        log("[PADDLE]   dynamic /paddle.js FAILED — CDN fallback");
+        s.remove();
+        var s2 = document.createElement("script"); s2.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
+        s2.onload = function(){ log("[PADDLE]   CDN loaded OK"); resolve(); };
+        s2.onerror = function(){ log("[PADDLE]   CDN FAILED too"); resolve(); };
+        document.head.appendChild(s2);
+      };
       document.head.appendChild(s);
     });
-    await new Promise(r => setTimeout(r, 500));
-    hasPaddle = typeof Paddle !== "undefined";
-    hasCheckout = hasPaddle && !!Paddle.Checkout;
-    console.log("[PADDLE] fallback check: Paddle=" + hasPaddle + " Checkout=" + hasCheckout);
+    await new Promise(function(r){ setTimeout(r, 800); });
+    hasP = typeof Paddle !== "undefined";
+    hasC = hasP && !!Paddle.Checkout;
+    log("[PADDLE] After fallback: Paddle=" + hasP + " Checkout=" + hasC);
   }
 
-  if (!hasPaddle || !hasCheckout) {
-    console.error("[PADDLE] FAIL: SDK not available");
+  if (!hasP || !hasC) {
+    log("[PADDLE] X FAIL: SDK not available after all attempts");
     paddleAvailable = false;
     return false;
   }
 
   try {
+    log("[PADDLE] Step 2: Initialize()");
     Paddle.Environment.set("live");
     Paddle.Initialize({
       token: "live_8de9d646e470503d57b4c3cdc60",
       onUpdate: function() {},
       onCheckoutClose: function() {}
     });
-    console.log("[PADDLE] Initialize() OK ✓");
+    log("[PADDLE] Initialize() OK ✓");
     paddleAvailable = true;
     return true;
   } catch(e) {
-    console.error("[PADDLE] Initialize() threw:", e.message);
+    log("[PADDLE] X Initialize() THREW: " + e.message);
+    if (e.stack) log("[PADDLE] stack: " + e.stack.substring(0, 300));
     paddleAvailable = false;
     return false;
   }
