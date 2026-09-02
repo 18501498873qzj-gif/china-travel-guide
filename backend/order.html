@@ -704,57 +704,75 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
 
   // Use Paddle SDK directly — let SDK handle URL construction + encoding
   // This GUARANTEES payload format matches what buy.paddle.com expects
-  // ==== ULTIMATE PADDLE HACK ====
-  // Problem 1: Paddle.Checkout.open() uses iframe overlay → iframe DNS bypasses user proxy → "找不到IP"
-  // Problem 2: Hand-built hosted URL can never match SDK's exact encoding (payload, snake_case, btoa rules)
-  // Solution: Let SDK build the URL, but intercept it BEFORE iframe navigates, then use TOP-LEVEL window.location
-  // which GUARANTEES full proxy (including DNS) per browser spec.
+  // ==== BULLETPROOF PADDLE FIX ====
+  // Root cause: Paddle.Checkout.open() opens iframe overlay → iframe DNS bypasses user proxy → ERR_NAME_NOT_RESOLVED
+  // Our fix: intercept iframe src AT THE MOMENT SDK sets it (before browser tries to load), 
+  // then DESTROY the iframe and do TOP-LEVEL navigation which GUARANTEES proxy DNS.
 
-  // Pre-fetch the hosted URL via SDK internals — we patch PaddleFrame.prototype.open to extract URL
-  var _originalOpen = XMLHttpRequest.prototype.open; // save (not used but safe)
-  var _capturedUrl = null;
+  var __capturedUrl = null;
+  var __originalSetAttribute = Element.prototype.setAttribute;
+  Element.prototype.setAttribute = function(name, value) {
+    // Intercept: iframe src containing paddle URL
+    if (name === "src" && value && typeof value === "string" && value.indexOf("paddle") >= 0) {
+      __capturedUrl = value;
+      console.log("[PADDLE] Captured SDK iframe URL:", value.substring(0, 120) + "...");
+    }
+    return __originalSetAttribute.apply(this, arguments);
+  };
 
-  // Monkey-patch PaddleFrame.setSrc to capture the URL SDK generates
-  try {
-    var _origSetAttribute = Element.prototype.setAttribute;
-    document.addEventListener("DOMSubtreeModified", function hook() {
-      var iframes = document.querySelectorAll("iframe[src*='paddle']");
-      if (iframes.length > 0) {
-        _capturedUrl = iframes[0].getAttribute("src");
-        document.removeEventListener("DOMSubtreeModified", hook);
-      }
-    }, false);
-  } catch(e) {}
+  var __origCreateElement = document.createElement.bind(document);
+  document.createElement = function(tag) {
+    var el = __origCreateElement(tag);
+    if (tag.toLowerCase() === "iframe") {
+      // Intercept iframe src setters too
+      try {
+        var _src = null;
+        Object.defineProperty(el, "src", {
+          get: function() { return _src; },
+          set: function(v) {
+            _src = v;
+            if (v && v.indexOf("paddle") >= 0) {
+              __capturedUrl = v;
+              console.log("[PADDLE] Captured via property:", v.substring(0, 120));
+            }
+            // Use native setter via __proto__
+            try { el.__proto__.src = v; } catch(e){}
+          }
+        });
+      } catch(e) {}
+    }
+    return el;
+  };
 
-  // Now call SDK normally — it will build correct URL and try to open iframe
+  // Now call SDK — it will create iframe, set src to correct Paddle URL
   Paddle.Checkout.open({
     items: [{ priceId: "pri_01m0h0hs1axtqq0fzssmk99qm1", quantity: 1 }],
     customer: { email: data.email },
     customData: { email: data.email, orderId: orderId },
     settings: {
       successUrl: window.location.origin + "/order?success=true",
-      themeMode: "light",
-      displayMode: "overlay"
+      themeMode: "light"
     }
   });
 
-  // Wait for SDK to create iframe, extract URL, then top-level navigate
-  var _attempts = 0;
-  var _waitForUrl = setInterval(function() {
-    _attempts++;
-    var iframe = document.querySelector("iframe[src*='paddle']");
-    if (iframe && iframe.src && iframe.src.indexOf("paddle") >= 0) {
-      var correctUrl = iframe.src;
-      console.log("[PADDLE] SDK-generated URL captured:", correctUrl.substring(0, 120) + "...");
-      // Kill SDK iframe & overlay
-      var overlays = document.querySelectorAll("[class*='paddle']");
-      overlays.forEach(function(el){ try{ el.remove(); }catch(e){} });
-      // Top-level navigation — proxy DNS GUARANTEED
-      window.location.href = correctUrl;
-      clearInterval(_waitForUrl);
-    } else if (_attempts > 30) { // 3s max
-      console.error("[PADDLE] Failed to capture SDK URL after 3s");
-      clearInterval(_waitForUrl);
+  // Wait for SDK to set iframe src, then top-level navigate
+  var __attempts = 0;
+  var __timer = setInterval(function() {
+    __attempts++;
+    if (__capturedUrl) {
+      console.log("[PADDLE] Navigating top-level to:", __capturedUrl.substring(0, 120) + "...");
+      // Destroy all Paddle overlays/iframes
+      var all = document.querySelectorAll("[class*='paddle'], [id*='paddle'], iframe[src*='paddle']");
+      for (var i = 0; i < all.length; i++) { try { all[i].remove(); } catch(e){} }
+      // Restore original setAttribute
+      Element.prototype.setAttribute = __originalSetAttribute;
+      // TOP-LEVEL NAV — proxy DNS guaranteed
+      window.location.href = __capturedUrl;
+      clearInterval(__timer);
+    } else if (__attempts > 50) { // 5s timeout
+      console.error("[PADDLE] URL capture timed out");
+      clearInterval(__timer);
+      Element.prototype.setAttribute = __originalSetAttribute;
     }
   }, 100);
 });
