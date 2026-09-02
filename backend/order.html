@@ -709,24 +709,14 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
   //        + encodeURIComponent(btoa(encodeURIComponent(snake_case(JSON))))
   // buy.paddle.com is reachable via proxy in China; top-level nav bypasses iframe DNS issues.
   var __sourcePage = window.location.href.split("#")[0];
-  var __toSnake = function(s) { return s.split(/(?=[A-Z])/).join("_").toLowerCase(); };
-  var __snakeKeys = function(o) {
-    if (Array.isArray(o)) return o.map(__snakeKeys);
-    if (o && typeof o === "object") {
-      var r = {};
-      for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) r[__toSnake(k)] = __snakeKeys(o[k]);
-      return r;
-    }
-    return o;
-  };
-  var __payload = __snakeKeys({
+var __payload = {
     items: [{ priceId: "pri_01m0h0hs1axtqq0fzssmk99qm1", quantity: 1 }],
     customData: { email: data.email, orderId: orderId, preferences: JSON.stringify(data) },
     customer: { email: data.email },
     settings: { sourcePage: __sourcePage, successUrl: window.location.origin + "/order?success=true", themeMode: "light" },
     "paddlejs-version": "2.9.4",
     checkoutInitiated: Date.now()
-  });
+  };
   var __enc = encodeURIComponent(window.btoa(encodeURIComponent(JSON.stringify(__payload))));
   var hostedUrl = "https://buy.paddle.com/paddlejs/v2?source_page=" + encodeURIComponent(__sourcePage) + "#payload=" + __enc;
   console.log("[PADDLE] Hosted URL:", hostedUrl.substring(0, 100) + "...");
