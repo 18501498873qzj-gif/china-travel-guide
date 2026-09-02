@@ -1,13 +1,5 @@
 
-// Cache-busting for HTML pages — browsers must always fetch fresh
-app.use((req, res, next) => {
-  if (req.path.endsWith('.html') || req.path === '/') {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
-  next();
-});
+;
 // veFaaS Serverless 函数入口
 // 旅行攻略生成器：飞书知识库 + DeepSeek + .doc 输出 + 邮件发送
 
