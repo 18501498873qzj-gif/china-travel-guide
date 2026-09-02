@@ -702,26 +702,20 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
     return;
   }
 
-  // Open Paddle checkout (real, for overseas users)
-  Paddle.Checkout.open({
-    items: [{ priceId: 'pri_01m0h0hs1axtqq0fzssmk99qm1', quantity: 1 }],
-    customData: {
-      email: data.email,
-      orderId: orderId,
-      preferences: JSON.stringify(data)
-    },
-    customer: { email: data.email },
-    settings: {
-      successUrl: window.location.origin + '/order?success=true',
-      themeMode: 'light'
-    },
-    eventCallback: function(event) {
-      if (event.name === 'checkout.completed') {
-        // Payment succeeded — redirect to success page
-        window.location.href = window.location.origin + '/order?success=true';
-      }
-    }
-  });
+  // Use HOSTED checkout — top-level browser navigation, GUARANTEED to go through user proxy (DNS included)
+  // Paddle v2 hosted URL: https://live.paddle.com/checkout/?priceId=XXX&email=XXX&...
+  var hostedUrl = 'https://live.paddle.com/checkout/?' +
+    'priceId=pri_01m0h0hs1axtqq0fzssmk99qm1' +
+    '&email=' + encodeURIComponent(data.email) +
+    '&customData[orderId]=' + encodeURIComponent(orderId) +
+    '&customData[preferences]=' + encodeURIComponent(JSON.stringify(data)) +
+    '&customer[email]=' + encodeURIComponent(data.email) +
+    '&settings[successUrl]=' + encodeURIComponent(window.location.origin + '/order?success=true') +
+    '&settings[themeMode]=light';
+  console.log('[PADDLE] Hosted checkout URL:', hostedUrl);
+  var diag = document.getElementById('paddleDiag');
+  if (diag) diag.textContent += '\n[PADDLE] Navigating to hosted checkout...';
+  window.location.href = hostedUrl;
 });
 
 // ---- Multi-language success messages ----
