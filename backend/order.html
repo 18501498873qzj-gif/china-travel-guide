@@ -290,35 +290,42 @@ async function ensurePaddle() {
   if (paddleAvailable === true) return true;
   if (paddleAvailable === false) return false;
 
-  // Load paddle SDK: try Paddle CDN first (works with proxy/VPN),
-  // fallback to our local copy (works in China without proxy).
+  // Load paddle SDK from local copy hosted on our server.
+  // Always works if the page loads (Render serves /paddle.js).
   await new Promise((resolve) => {
     if (document.getElementById("paddleScript")) return resolve();
     const s = document.createElement("script");
     s.id = "paddleScript";
-    s.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
-    s.onload = resolve;
+    s.src = "/paddle.js";
+    s.onload = function() {
+      console.log("[PADDLE] /paddle.js loaded OK ✓");
+      resolve();
+    };
     s.onerror = function() {
+      console.error("[PADDLE] /paddle.js FAILED — fallback to CDN");
       s.remove();
       const s2 = document.createElement("script");
       s2.id = "paddleScript";
-      s2.src = "/paddle.js";
-      s2.onload = resolve;
-      s2.onerror = resolve;
+      s2.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
+      s2.onload = function() { console.log("[PADDLE] CDN loaded OK ✓"); resolve(); };
+      s2.onerror = function() { console.error("[PADDLE] CDN also failed ✗"); resolve(); };
       document.head.appendChild(s2);
     };
     document.head.appendChild(s);
   });
 
-  await new Promise(r => setTimeout(r, 400));
+  await new Promise(r => setTimeout(r, 500));
 
-  if (typeof Paddle === "undefined" || !Paddle.Checkout) {
+  var hasPaddle = typeof Paddle !== "undefined";
+  var hasCheckout = hasPaddle && !!Paddle.Checkout;
+  console.log("[PADDLE] post-load: Paddle=" + hasPaddle + " Checkout=" + hasCheckout);
+
+  if (!hasPaddle || !hasCheckout) {
+    console.error("[PADDLE] FAIL: SDK not available after script load");
     paddleAvailable = false;
     return false;
   }
 
-  // Paddle v2 Initialize() is SYNC - no network test here.
-  // Actual connectivity is handled later by Checkout.open() itself.
   try {
     Paddle.Environment.set("live");
     Paddle.Initialize({
@@ -326,9 +333,11 @@ async function ensurePaddle() {
       onUpdate: function() {},
       onCheckoutClose: function() {}
     });
+    console.log("[PADDLE] Initialize() OK ✓");
     paddleAvailable = true;
     return true;
   } catch(e) {
+    console.error("[PADDLE] Initialize() threw:", e.message);
     paddleAvailable = false;
     return false;
   }
@@ -677,7 +686,7 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
         '<div style="font-weight:700;margin-bottom:.5rem;">Payment temporarily unavailable</div>' +
         '<div style="font-size:.85rem;color:#666;line-height:1.5;margin-bottom:1rem;">Trouble connecting to our payment provider from your network.<br>Please try again later or contact us.</div>' +
         '<div style="font-size:.82rem;color:#888;background:#f8f9fa;padding:.6rem;border-radius:6px;margin-bottom:1rem;">✉️ support@chinatravelguide.ai</div>' +
-        '<button onclick="document.getElementById(simCheckout).remove()" style="background:#1a1a1a;color:#fff;border:none;padding:.7rem 1.5rem;border-radius:8px;cursor:pointer;font-weight:600;">Close</button>' +
+        '<button onclick="document.getElementById(&quot;simCheckout&quot;).remove()" style="background:#1a1a1a;color:#fff;border:none;padding:.7rem 1.5rem;border-radius:8px;cursor:pointer;font-weight:600;">Close</button>' +
         '</div>';
       document.body.appendChild(overlay);
     }
