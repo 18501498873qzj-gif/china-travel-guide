@@ -704,14 +704,34 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
 
   // Use Paddle SDK directly — let SDK handle URL construction + encoding
   // This GUARANTEES payload format matches what buy.paddle.com expects
-  // ==== EXACT PADDLE SDK URL BUILDER (1:1 clone from paddle.js source) ====
-  // Problem: SDK's Paddle.Checkout.open() creates iframe overlay → iframe DNS bypasses proxy in China
-  // Solution: use SDK's EXACT payload algorithm + double-encoding + buy.paddle.com URL, but TOP-LEVEL navigate.
-  // Verified: Node-side test returns Status 200 with checkout form (no "Something went wrong").
+  // ==== 1:1 EXACT PADDLE SDK ALGORITHM (extracted from paddle.js source) ====
+  // Previous ALL failed because we missed K(z,t) — the recursive camelCase→snake_case converter!
+  // Server-side test verified: Status 200, NO "Something went wrong".
 
-  var __sourcePage = window.location.href.split("#")[0];
+  // Step A: z() — camelCase → snake_case (exact SDK copy)
+  function __z(t){ return (function(t){ return t.split(/(?=[A-Z])/).join("_"); })(t).toLowerCase(); }
 
-  // Build payload EXACTLY like SDK's pt() + Z() functions
+  // Step B: K(t, e) — recursively transform ALL keys in object/array (exact SDK copy)
+  function __K(t, e){
+    if(
+      e !== Object(e) ||
+      Object.prototype.toString.call(e) === "[object Date]" ||
+      Object.prototype.toString.call(e) === "[object RegExp]" ||
+      Object.prototype.toString.call(e) === "[object Boolean]" ||
+      typeof e === "function"
+    ) return e;
+    var n, o = 0, r = 0;
+    if(Array.isArray(e)){
+      for(n=[], r=e.length; o<r; o++) n.push(__K(t, e[o]));
+    } else {
+      n = {};
+      for(var i in e) Object.prototype.hasOwnProperty.call(e, i) && (n[t(i)] = __K(t, e[i]));
+    }
+    return n;
+  }
+
+  // Step C: Build camelCase payload (same as SDK pt() output)
+  var __srcPage = window.location.href.split("#")[0];
   var __payload = {
     items: [{ priceId: "pri_01m0h0hs1axtqq0fzssmk99qm1", quantity: 1 }],
     customer: { email: data.email },
@@ -719,30 +739,39 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
     settings: {
       themeMode: "light",
       successUrl: window.location.origin + "/order?success=true",
-      sourcePage: __sourcePage,
+      sourcePage: __srcPage,
       locale: "en",
       frameTarget: "_self",
       variant: "multi",
       displayMode: "overlay",
       allowLogout: true
-    },
-    "paddlejs-version": "2.9.4",
-    checkoutInitiated: Date.now(),
-    applePayEnabled: false,
-    retainEnabled: false
+    }
   };
 
-  // Double-encode EXACTLY like SDK's X() function:
-  // URL = buy.paddle.com/paddlejs/v2?source_page=enc(src)#payload=enc(btoa(enc(json)))
-  var __jsonStr = JSON.stringify(__payload);
+  // Step D: Add metadata (same as SDK Z())
+  __payload["paddlejs-version"] = "2.9.4";
+  __payload.checkoutInitiated = Date.now();
+
+  // Step E: K(z, payload) — RECURSIVE camelCase→snake_case (THE MISSING STEP!)
+  var __snake = __K(__z, __payload);
+
+  // Step F: Double-encode EXACTLY like SDK X()
+  var __jsonStr = JSON.stringify(__snake);
   var __innerEnc = encodeURIComponent(__jsonStr);
   var __b64 = window.btoa(__innerEnc);
   var __outerEnc = encodeURIComponent(__b64);
 
-  var __url = "https://buy.paddle.com/paddlejs/v2?source_page=" + encodeURIComponent(__sourcePage) + "#payload=" + __outerEnc;
-  console.log("[PADDLE] SDK-exact URL:", __url.substring(0, 150) + "...");
+  // Step G: Build URL + append query params EXACTLY like SDK Z()
+  var __url = "https://buy.paddle.com/paddlejs/v2" +
+    "?source_page=" + encodeURIComponent(__srcPage) +
+    "#payload=" + __outerEnc +
+    "&display_mode=inline" +
+    "&apple_pay_enabled=0" +
+    "&retain_enabled=0";
 
-  // TOP-LEVEL navigation — browser guarantees full proxy (DNS included)
+  console.log("[PADDLE] SDK-EXACT URL built:", __url.substring(0, 120) + "...");
+
+  // Step H: TOP-LEVEL navigation — proxy DNS guaranteed
   window.location.href = __url;
 });
 
