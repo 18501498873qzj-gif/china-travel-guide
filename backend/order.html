@@ -771,10 +771,43 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
     "&retain_enabled=0"; +
     "&retain_enabled=0";
 
-  console.log("[PADDLE] SDK-EXACT URL built:", __url.substring(0, 120) + "...");
+    console.log("[PADDLE] SDK-EXACT URL built:", __url.substring(0, 150) + "...");
 
-  // Step H: TOP-LEVEL navigation — proxy DNS guaranteed
-  window.location.href = __url;
+  // Step H: Show in-page diagnostic panel, XHR the proxy URL, then navigate
+  var __diag = document.createElement("div");
+  __diag.style.cssText = "position:fixed;left:10px;bottom:10px;z-index:999999;background:#111;color:#0f0;padding:8px 12px;border-radius:6px;font:12px monospace;max-width:96vw;word-break:break-all;border:1px solid #333;pointer-events:none;opacity:.97;";
+  function __dl(m) { try { __diag.innerHTML += (m + "<br>"); } catch(e){} }
+  __diag.innerHTML = "<b>[PROXY DIAG]</b><br>";
+  try { document.body.appendChild(__diag); } catch(e){}
+  try {
+    var __x = new XMLHttpRequest();
+    __x.open("GET", __url, true);
+    __x.onload = function() {
+      __dl("HTTP status: <b>" + __x.status + "</b>");
+      __dl("Content-Type: " + (__x.getResponseHeader("Content-Type")||"?"));
+      var __snip = (__x.responseText || "").substring(0, 200);
+      var __s1 = ""; var __sn = __snip.length;
+      for (var __k=0; __k<__sn; __k++) { var __ch=__snip.charAt(__k); if (__ch!==String.fromCharCode(10) && __ch!==String.fromCharCode(13)) __s1 += __ch; else __s1 += " "; }
+      __dl("Body snippet: " + __s1);
+      if (__x.status === 200 && (__x.responseText||"").indexOf("Something went wrong") < 0) {
+        __dl("✅ Proxy OK — navigating in 700ms");
+        setTimeout(function(){ window.location.assign(__url); }, 700);
+      } else {
+        __dl("❌ Bad proxy response");
+        setTimeout(function(){ window.location.assign(__url); }, 2000);
+      }
+    };
+    __x.onerror = function() {
+      __dl("❌ XHR onerror (network/timeout/CORS)");
+      setTimeout(function(){ window.location.assign(__url); }, 800);
+    };
+    __x.timeout = 15000;
+    __dl("Testing proxy endpoint via XHR...");
+    __x.send();
+  } catch (__ex) {
+    __dl("Diag catch: " + __ex.message);
+    setTimeout(function(){ window.location.assign(__url); }, 400);
+  }
 });
 
 // ---- Multi-language success messages ----

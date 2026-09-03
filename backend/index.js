@@ -807,14 +807,27 @@ if (require.main === module) {
             path: u.pathname + u.search + u.hash,
             method: 'GET',
             headers: {
-              'User-Agent': 'Mozilla/5.0 (compatible; PaddleProxy/1.0; +chinatravelguide.ai)',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.9'
+              'Host': 'buy.paddle.com',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Cache-Control': 'max-age=0',
+              'Sec-Ch-Ua': '"Chromium";v="126", "Google Chrome";v="126"',
+              'Sec-Ch-Ua-Mobile': '?0',
+              'Sec-Ch-Ua-Platform': '"Windows"',
+              'Sec-Fetch-Dest': 'document',
+              'Sec-Fetch-Mode': 'navigate',
+              'Sec-Fetch-Site': 'none',
+              'Upgrade-Insecure-Requests': '1',
+              'Priority': 'u=0, i'
             },
             timeout: 30000
           };
 
+          console.log('[PROXY] → buy.paddle.com status: target=', opts.path.substring(0,80));
           var proxyReq = https.request(opts, function(proxyRes) {
+            console.log('[PROXY] ← Paddle status=', proxyRes.statusCode, 'ctype=', proxyRes.headers['content-type']?.substring(0,50), 'clen=', proxyRes.headers['content-length']||'chunked');
             // Forward status + headers but fix any absolute redirect Location headers
             var headers = {};
             for (var h in proxyRes.headers) {
