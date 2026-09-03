@@ -811,7 +811,7 @@ if (require.main === module) {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
               'Accept-Language': 'en-US,en;q=0.9',
-              'Accept-Encoding': 'gzip, deflate, br',
+              'Accept-Encoding': 'identity',
               'Cache-Control': 'max-age=0',
               'Sec-Ch-Ua': '"Chromium";v="126", "Google Chrome";v="126"',
               'Sec-Ch-Ua-Mobile': '?0',
@@ -848,9 +848,29 @@ if (require.main === module) {
             if (!headers['content-length'] && !proxyRes.headers['transfer-encoding']) {
               // ok, default to chunked
             }
-            res.writeHead(proxyRes.statusCode, headers);
-            console.log('[PADDLE PROXY] ✓', proxyRes.statusCode);
-            proxyRes.pipe(res);
+            var isHtml = (headers['content-type'] || '').toLowerCase().indexOf('text/html') >= 0;
+            if (isHtml) {
+              var chunks = [];
+              proxyRes.on('data', function(c) { chunks.push(c); });
+              proxyRes.on('end', function() {
+                var body = Buffer.concat(chunks).toString('utf-8');
+                var rewritten = body
+                  .replace(/https:\/\/buy\.paddle\.com\//g, '/paddle-checkout/')
+                  .replace(/http:\/\/buy\.paddle\.com\//g, '/paddle-checkout/')
+                  .replace(/buy\.paddle\.com\//g, '/paddle-checkout/');
+                var newBuf = Buffer.from(rewritten, 'utf-8');
+                headers['content-length'] = newBuf.length;
+                delete headers['transfer-encoding'];
+                res.writeHead(proxyRes.statusCode, headers);
+                res.end(newBuf);
+                console.log('[PADDLE PROXY] ✓ HTML rewritten:', body.length, '→', rewritten.length);
+              });
+            } else {
+              delete headers['content-length'];
+              res.writeHead(proxyRes.statusCode, headers);
+              proxyRes.pipe(res);
+              console.log('[PADDLE PROXY] ✓ stream (non-html)');
+            }
           });
 
           proxyReq.on('timeout', function() {
