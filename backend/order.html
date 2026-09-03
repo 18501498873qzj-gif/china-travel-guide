@@ -762,7 +762,7 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
   var __outerEnc = encodeURIComponent(__b64);
 
   // Step G: Build URL + append query params EXACTLY like SDK Z()
-    var __url = "/paddle-checkout" +
+    var __url = window.location.origin + "/paddle-checkout" +
     "/paddlejs/v2" +
     "?source_page=" + encodeURIComponent(__srcPage) +
     "&payload=" + __outerEnc +
