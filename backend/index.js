@@ -792,6 +792,9 @@ if (require.main === module) {
           // Extract path after /paddle-checkout — preserve EXACTLY what's there
           var rest = req.url.substring('/paddle-checkout'.length);
           if (!rest || rest.charAt(0) !== '/') rest = '/' + rest;
+          // Convert query-param payload back to hash fragment (browser strips hash from HTTP requests,
+          // Paddle hosted page expects payload in #hash format)
+          rest = rest.replace('&payload=', '#payload=');
           var target = 'https://buy.paddle.com' + rest;
           // Also handle /paddle-checkout?paddlejs/v2?xxx#yyy style (some browsers encode differently)
           if (rest.substring(0, 8) === '//buy.paddle.com') target = 'https:' + rest.substring(1);

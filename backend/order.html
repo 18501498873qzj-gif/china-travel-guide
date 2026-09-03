@@ -765,7 +765,7 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
     var __url = "/paddle-checkout" +
     "/paddlejs/v2" +
     "?source_page=" + encodeURIComponent(__srcPage) +
-    "#payload=" + __outerEnc +
+    "&payload=" + __outerEnc +
     "&display_mode=inline" +
     "&apple_pay_enabled=0" +
     "&retain_enabled=0"; +
