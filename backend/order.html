@@ -40,6 +40,10 @@ textarea { resize: vertical; min-height: 60px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .error-msg { color: #c0392b; font-size: 0.9rem; margin-top: 0.5rem; }
 @media (max-width: 600px) { .row { flex-direction: column; gap: 0; } }
+
+/* Hide all Paddle diagnostic panels — user-facing UI must be clean */
+#paddleDiag, [id*="diag" i], [id*="check" i] { display: none !important; visibility: hidden !important; pointer-events: none !important; }
+
 </style>
 <script src="/paddle.js"></script>
 </head>
@@ -768,7 +772,6 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
     "&payload=" + __outerEnc +
     "&display_mode=inline" +
     "&apple_pay_enabled=0" +
-    "&retain_enabled=0"; +
     "&retain_enabled=0";
 
     console.log("[PADDLE] SDK-EXACT URL built:", __url.substring(0, 150) + "...");
