@@ -40,10 +40,6 @@ textarea { resize: vertical; min-height: 60px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .error-msg { color: #c0392b; font-size: 0.9rem; margin-top: 0.5rem; }
 @media (max-width: 600px) { .row { flex-direction: column; gap: 0; } }
-
-/* Hide all Paddle diagnostic panels — user-facing UI must be clean */
-#paddleDiag, [id*="diag" i], [id*="check" i] { display: none !important; visibility: hidden !important; pointer-events: none !important; }
-
 </style>
 <script src="/paddle.js"></script>
 </head>
@@ -292,37 +288,20 @@ textarea { resize: vertical; min-height: 60px; }
 let paddleAvailable = null; // null = 未检测，true/false = 已检测
 
 async function ensurePaddle() {
-  // Add floating diagnostic div so user sees everything
-  var diag = document.createElement("div");
-  diag.id = "paddleDiag";
-  diag.style.cssText = "position:fixed;bottom:10px;right:10px;max-width:340px;background:#1a1a1a;color:#fff;font-family:monospace;font-size:11px;padding:10px;border-radius:8px;z-index:10000;white-space:pre-wrap;line-height:1.5;box-shadow:0 4px 20px rgba(0,0,0,.3);max-height:50vh;overflow-y:auto;";
-  diag.textContent = "[PADDLE] checking...";
-  document.body.appendChild(diag);
-  var log = function(msg) { diag.textContent += "\n" + msg; console.log(msg); };
+  if (paddleAvailable === true) { return true; }
 
-  if (paddleAvailable === true) { log("[PADDLE] already cached=true"); return true; }
-  // Don't cache false — user should be able to retry
-
-  log("[PADDLE] Step 1: static <script src=/paddle.js> check");
   var hasP = typeof Paddle !== "undefined";
   var hasC = hasP && !!Paddle.Checkout;
-  log("[PADDLE]   window.Paddle exists = " + hasP);
-  log("[PADDLE]   Paddle.Checkout exists = " + hasC);
-  log("[PADDLE]   window.exports = " + typeof window.exports);
-  log("[PADDLE]   window.module = " + typeof window.module);
 
-  // If static load missed, try dynamic
   if (!hasP || !hasC) {
-    log("[PADDLE] Static missed — dynamic /paddle.js fallback");
     await new Promise(function(resolve) {
       var s = document.createElement("script"); s.src = "/paddle.js";
-      s.onload = function(){ log("[PADDLE]   dynamic /paddle.js loaded OK"); resolve(); };
+      s.onload = function(){ resolve(); };
       s.onerror = function(){
-        log("[PADDLE]   dynamic /paddle.js FAILED — CDN fallback");
         s.remove();
         var s2 = document.createElement("script"); s2.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
-        s2.onload = function(){ log("[PADDLE]   CDN loaded OK"); resolve(); };
-        s2.onerror = function(){ log("[PADDLE]   CDN FAILED too"); resolve(); };
+        s2.onload = function(){ resolve(); };
+        s2.onerror = function(){ resolve(); };
         document.head.appendChild(s2);
       };
       document.head.appendChild(s);
@@ -330,27 +309,21 @@ async function ensurePaddle() {
     await new Promise(function(r){ setTimeout(r, 800); });
     hasP = typeof Paddle !== "undefined";
     hasC = hasP && !!Paddle.Checkout;
-    log("[PADDLE] After fallback: Paddle=" + hasP + " Checkout=" + hasC);
   }
 
   if (!hasP || !hasC) {
-    log("[PADDLE] X FAIL: SDK not available after all attempts");
     paddleAvailable = false;
     return false;
   }
 
   try {
-    log("[PADDLE] Step 2: Initialize()");
     Paddle.Environment.set("live");
     Paddle.Initialize({
       token: "live_8de9d646e470503d57b4c3cdc60",
     });
-    log("[PADDLE] Initialize() OK ✓");
     paddleAvailable = true;
     return true;
   } catch(e) {
-    log("[PADDLE] X Initialize() THREW: " + e.message);
-    if (e.stack) log("[PADDLE] stack: " + e.stack.substring(0, 300));
     paddleAvailable = false;
     return false;
   }
@@ -776,41 +749,8 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
 
     console.log("[PADDLE] SDK-EXACT URL built:", __url.substring(0, 150) + "...");
 
-  // Step H: Show in-page diagnostic panel, XHR the proxy URL, then navigate
-  var __diag = document.createElement("div");
-  __diag.style.cssText = "position:fixed;left:10px;bottom:10px;z-index:999999;background:#111;color:#0f0;padding:8px 12px;border-radius:6px;font:12px monospace;max-width:96vw;word-break:break-all;border:1px solid #333;pointer-events:none;opacity:.97;";
-  function __dl(m) { try { __diag.innerHTML += (m + "<br>"); } catch(e){} }
-  __diag.innerHTML = "<b>[PROXY DIAG]</b><br>";
-  try { document.body.appendChild(__diag); } catch(e){}
-  try {
-    var __x = new XMLHttpRequest();
-    __x.open("GET", __url, true);
-    __x.onload = function() {
-      __dl("HTTP status: <b>" + __x.status + "</b>");
-      __dl("Content-Type: " + (__x.getResponseHeader("Content-Type")||"?"));
-      var __snip = (__x.responseText || "").substring(0, 200);
-      var __s1 = ""; var __sn = __snip.length;
-      for (var __k=0; __k<__sn; __k++) { var __ch=__snip.charAt(__k); if (__ch!==String.fromCharCode(10) && __ch!==String.fromCharCode(13)) __s1 += __ch; else __s1 += " "; }
-      __dl("Body snippet: " + __s1);
-      if (__x.status === 200 && (__x.responseText||"").indexOf("Something went wrong") < 0) {
-        __dl("✅ Proxy OK — navigating in 700ms");
-        setTimeout(function(){ window.location.assign(__url); }, 700);
-      } else {
-        __dl("❌ Bad proxy response");
-        setTimeout(function(){ window.location.assign(__url); }, 2000);
-      }
-    };
-    __x.onerror = function() {
-      __dl("❌ XHR onerror (network/timeout/CORS)");
-      setTimeout(function(){ window.location.assign(__url); }, 800);
-    };
-    __x.timeout = 15000;
-    __dl("Testing proxy endpoint via XHR...");
-    __x.send();
-  } catch (__ex) {
-    __dl("Diag catch: " + __ex.message);
-    setTimeout(function(){ window.location.assign(__url); }, 400);
-  }
+    // Navigate directly to Paddle hosted checkout via Render proxy
+    window.location.assign(__url);
 });
 
 // ---- Multi-language success messages ----
