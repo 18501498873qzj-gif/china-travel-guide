@@ -658,9 +658,11 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
 
   if (!available) {
     // Paddle blocked in this region
-    // Normal visitors: friendly msg only. Dev: URL ?dev=1 or localStorage simAdmin=true
+    // Simulated checkout ONLY on localhost dev (?dev=1 or localStorage simAdmin=true).
+    // Production never gets the sim checkout — server webhook rejects unsigned payloads anyway.
+    const isLocalhost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
     const urlParams = new URLSearchParams(window.location.search);
-    const isDev = urlParams.get('dev') === '1' || localStorage.getItem('simAdmin') === 'true';
+    const isDev = isLocalhost && (urlParams.get('dev') === '1' || localStorage.getItem('simAdmin') === 'true');
     if (isDev) {
       openSimulatedCheckout(data);
     } else {

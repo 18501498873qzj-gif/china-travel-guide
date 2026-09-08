@@ -1053,8 +1053,7 @@ if (require.main === module) {
           // 🔒 Paddle Webhook 签名校验（Paddle-Signature: ts=xxx;h1=xxx）
           const sigHeader = (req.headers['paddle-signature'] || req.headers['Paddle-Signature'] || '');
           const webhookSecret = process.env.PADDLE_WEBHOOK_SECRET || '';
-          if (webhookSecret && webhookSecret.length > 0 && sigHeader.length > 0) {
-            const tsMatch = sigHeader.match(/ts=([^;]+)/);
+          if (webhookSecret && webhookSecret.length > 0 && sigHeader.length > 0) {            const tsMatch = sigHeader.match(/ts=([^;]+)/);
             const h1Match = sigHeader.match(/h1=([a-fA-F0-9]+)/);
             if (!tsMatch || !h1Match) {
               console.warn('[WEBHOOK] 签名格式不合法，丢弃请求');
@@ -1083,7 +1082,14 @@ if (require.main === module) {
               return;
             }
             console.log('[WEBHOOK] ✅ Paddle 签名验证通过');
-          } else if (webhookSecret && webhookSecret.length > 0) {
+          } else if (!webhookSecret) {
+            // 🔒 Fail-closed: 未配置 PADDLE_WEBHOOK_SECRET 时拒绝所有 webhook，
+            // 防止伪造 transaction.completed 白嫖攻略（原逻辑会跳过校验直接放行）
+            console.warn('[WEBHOOK] ❌ 未配置 PADDLE_WEBHOOK_SECRET，拒绝处理（fail-closed）。请在 Render 环境变量中配置。');
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ received: false, error: 'webhook secret not configured' }));
+            return;
+          } else {
             console.warn('[WEBHOOK] 已配置 PADDLE_WEBHOOK_SECRET，但请求未带 Paddle-Signature 头。拒绝。');
             res.writeHead(403, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ received: false, error: 'missing paddle-signature header' }));
@@ -1095,6 +1101,13 @@ if (require.main === module) {
           console.log(`[WEBHOOK] 收到事件: ${eventType}`);
           if (eventType === 'transaction.completed') {
             const transaction = event.data || {};
+            // 🔒 双保险：拒绝本地模拟结账产生的交易 ID
+            if (String(transaction.id || '').startsWith('txn_sim_')) {
+              console.warn('[WEBHOOK] ❌ 检测到模拟交易 ID (txn_sim_)，拒绝处理');
+              res.writeHead(403, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ received: false, error: 'simulated transactions not accepted' }));
+              return;
+            }
             const customData = transaction.custom_data || {};
             const email = customData.email || (transaction.customer && transaction.customer.email);
             let preferences = null;
