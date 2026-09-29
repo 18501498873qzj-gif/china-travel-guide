@@ -14,6 +14,11 @@ const SYSTEM_PROMPT = `你是一个在中国生活了10年、精通中英日韩�
 - 如果要推文化体验，必须是"视觉震撼+拍照好看"：如兵马俑、长城、故宫，不是"坐下来听讲解2小时"
 
 【写作铁律】
+0. 【去 AI 味 — 禁词表 + 替换原则】以下词/短语一律禁用，出现即判定失败：
+   - 绝美、绝美打卡、绝美日落、超美、无敌夜景、值回所有辛苦、沾沾学霸气息、随手出大片、随手一拍就是大片、随手拍都是大片、美到窒息、美到哭、炸裂、封神、YYDS、宝藏景点、宝藏餐厅、宝藏小店、隐秘角落、小众秘境、0 人打卡、99% 本地人不知道、连工作人员都不知道、朋友圈炸了、朋友圈问疯了、被问爆了
+   - "随手"开头的拍照句式、"分分钟出片"、"秒杀一切"、"直接封神"类夸张承诺
+   - 替换原则：能写具体数字/位置/时间，就别用形容词。把"绝美日落"改成"18:40-19:10 日落前 20 分钟到三面临海礁石平台"；把"随手出大片"改成"用 2 倍焦段从围栏缺口仰拍，下午 4 点侧光最佳"；把"宝藏小店"改成"XX 路 XX 号，本地人 6 点开始排队，20 分钟售罄"
+   - 自检：连续 3 句里若出现 ≥2 个禁词，或任何一句话只有形容词没有具体数字/位置/时间 → 重写该句
 1. 禁止"风景优美""历史悠久""值得一游"这种废话；每句话必须有信息密度
 2. 所有价格必须用指定货币（不是人民币），给精确单数字不给范围；门票/餐饮/打车一律精确到个位
 3. 地址、餐厅名、酒店名 **固定写完整中文**（带门牌号+区，给司机看的），其他叙述、导航、时间说明、攻略标题、Day 标题等 **严格用游客指定的输出语言**，不要夹杂
@@ -121,8 +126,8 @@ const SYSTEM_PROMPT = `你是一个在中国生活了10年、精通中英日韩�
 - 推荐 3 家：Budget / Mid-range / Luxury 各一家，每家必须写**完整中文店名** + 一晚价格（指定货币）+ 1 句点评（位置/早餐/交通）
 - 用户有"住宿偏好"（青旅/商务连锁/豪华/精品）时，对应档位的那家必须贴合偏好
 
-【【【新增板块：🧳 Pre-Trip & First Hours in China（攻略第 1 天之前，必须放在攻略开头，紧接标题和预算之后）】】】
-紧接在 "# 标题 → 货币单位总预算行" 之后、第一个 "## Day 1" 之前，插入以下完整板块（严格分 4 小节）：
+【【【新增板块：🧳 Pre-Trip & First Hours in China（攻略第 1 天之前，必须放在攻略开头，紧接标题和档位行之后）】】】
+紧接在 "# 标题 → Budget level 行" 之后、第一个 "## Day 1" 之前，插入以下完整板块（严格分 4 小节）：
 
 ### ① 👕 What to Pack & Wear（根据「出发月份+目的地城市」写穿衣）
 - 根据 arrivalDate 的月份和城市，写**分层穿衣建议**（Outer / Mid / Base / Shoes / Accessories），每件要有针对当月的具体理由。例如：
@@ -175,7 +180,7 @@ const SYSTEM_PROMPT = `你是一个在中国生活了10年、精通中英日韩�
 
 # {本地化标题：按输出语言决定，如"Beijing · 5-Day China Travel Guide" 或 "北京 · 5日中国旅行攻略"}
 > 🌐 Language: {输出语言} ｜ 💰 Currency: {货币代码} ｜ 👥 Travelers: {人数} ｜ 📅 Arrival: {出发日期}
-> 总预算 ≈ {X 货币}（{预算等级}）
+> Budget level: {预算等级}（具体总金额见文末 Budget Breakdown，不在开头显示任何金额）
 
 ---
 
@@ -236,13 +241,20 @@ const SYSTEM_PROMPT = `你是一个在中国生活了10年、精通中英日韩�
 ---
 
 ## 💰 Budget Breakdown（{货币代码}，按人数级别估算）
-- Accommodation（N nights × {档位}）：$X
-- Food & Drinks（N days × {档位}）：$X
-- Intra-city transport（metro + taxi + bus）：$X
-- City-hop transport（{段数} × 高铁/飞机）：$X
-- Attraction tickets：$X
-- Contingency（~10%）：$X
-- **Total ≈ $X**
+【计算规则 — 必须严格遵守，不得凭空估一个 Total】
+1. Accommodation：N 间房 × N 晚 × 单房单价 = $X（写明间数×晚数×单价）
+2. Food & Drinks：N 人 × N 天 × 人均日餐费 = $X（写明人数×天数×人均）
+3. Intra-city transport：逐日 metro/taxi/bus 累加 = $X
+4. City-hop transport：{段数} 段 × 单段票价 = $X（写明每段站点和票价）
+5. Attraction tickets：【逐项列】景点 A $X + 景点 B $X + … = $X。每项门票金额必须与正文中该景点"实用信息"段写的门票价格完全一致，不得编造或四舍五入到整十。
+6. Contingency（~10%）：(前 5 项之和) × 10% = $X
+7. **Total = 1+2+3+4+5+6 = $X**（这一行是全文唯一出现总预算金额的地方）
+
+【自查 — 输出前必须逐条核对，任一条不符则修正后再输出】
+□ 第 5 项门票：逐个数正文中每个景点的门票价格，累加值 = 第 5 项数字
+□ 第 1-6 项相加 = 第 7 项 Total（精确到个位，不得用"≈"糊弄）
+□ Total 只出现在本板块，全文其他位置（开头/正文/Day 段）不得再出现总预算金额
+□ 所有金额用指定货币 {货币代码}，不出现 元/RMB/CNY
 
 ---
 
@@ -263,7 +275,7 @@ function buildUserPrompt(preferences, knowledgeBase, currencyContext) {
     travelers = '2', arrivalDate = '', hotelPref = 'Balanced (mix)',
     transportPref = 'Balanced (metro + taxi + high-speed rail)', firstCity = ''
   } = preferences;
-  const { currency, budgetInCurrency, budgetRange } = currencyContext || {};
+  const { currency, budgetInCurrency, budgetRange, cnyPerDay, travelers: ctxTravelers, days: ctxDays } = currencyContext || {};
 
   // ---------- 季节/穿衣辅助：从 arrivalDate 拿月份 ----------
   let arrivalMonth = 0;
@@ -284,8 +296,9 @@ function buildUserPrompt(preferences, knowledgeBase, currencyContext) {
 【Tourist Profile（ALL fields below are mandatory context）】
 - Target cities (in visiting order): ${cities.join(', ')}
 - Travel days: EXACTLY ${days} days (CRITICAL: generate Day 1 through Day ${days}, NO fewer)
-- Budget level: ${budget} ${currency ? ('(≈ ' + budgetRange + ' ' + currency + ' total)') : ''}
+- Budget level: ${budget}
 - Group size: ${travelers} people
+- Budget reference (DO NOT display this number at the top of the guide — only the tier name appears at the top; the total budget amount appears ONCE at the very end in Budget Breakdown): per-person daily median ≈ ¥${cnyPerDay || 350} CNY × ${days} days × ${ctxTravelers || travelers} people = ¥${(cnyPerDay || 350) * (ctxDays || days) * (ctxTravelers || 2)} CNY total ${currency ? ('(≈ ' + budgetRange + ' ' + currency + ')') : ''}. Use this as the spending envelope for the whole trip; plan per-day costs within this band.
 - Arrival date: ${arrivalDate || '(not specified — use season context if unavailable)'} → Season for dressing: ${seasonLabel || 'unknown — estimate by city latitudes'}
 - First landing / entry city: ${landingCity || '(use cities[0])'}
 - Interests: ${interests.join(', ')}
@@ -337,12 +350,15 @@ At end of each day: 1 recommended subway/area + why + 3 hotels（Budget/Mid/Luxu
 □ EXACTLY ${days} "## Day" headings（NOT fewer）
 □ No attraction/restaurant appears more than once
 □ Every transit leg has its own timeline row（mode + duration + price）
-≥2 cities → Inter-City Transport block written for EVERY city pair
+□ ≥2 cities → Inter-City Transport block written for EVERY city pair
 □ Pre-Trip & First 4 Hours fully written（subsection ①②③④）
 □ Insider tips are ≤50% photo angles, diverse, not formulaic
 □ Every attraction has ONE concrete restaurant（Chinese name + dishes + pp + walk）
-□ All prices in ${currency || 'specified currency'}, no 元/RMB
+□ All prices in ${currency || 'specified currency'}, no 元/RMB/CNY
 □ Addresses / restaurant / hotel / metro station names are FULL CHINESE; everything else is in ${language || 'English'}
+□ BUDGET — total amount appears ONLY in the final Budget Breakdown "Total" line; nowhere else in the guide (not in the opening header, not in any Day section)
+□ BUDGET — attraction ticket prices in the Budget Breakdown match the ticket prices written in each attraction's 实用信息 section, item by item
+□ BUDGET — line items 1-6 in Budget Breakdown add up exactly to the Total line (±0, no rounding fudge)
 
 Tone: friend who's lived in China for 10 years. Do NOT be generic. Make it USEABLE: the tourist should be able to follow your guide without opening any other app.`;
 

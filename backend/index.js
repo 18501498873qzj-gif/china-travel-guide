@@ -430,7 +430,7 @@ async function sendGuideEmail(to, fileName, docBuffer, preferences) {
   }
 }
 
-// 预算等级 → 每日人民币中位数（与前端保持一致）
+// 预算等级 → 单人每日人民币中位数（per-person-per-day，与前端 FOOD_COSTS/ACTIVITY_COSTS 口径一致）
 const BUDGET_CNY_PER_DAY = {
   'Backpacker (under ¥200/day)': 200,
   'Economy (¥200-500/day)': 350,
@@ -523,21 +523,31 @@ exports.handler = async (event, context) => {
       console.warn(`[WARN] 读取飞书知识库失败（将仅用 AI 生成）: ${err.message}`);
     }
 
-    // 1.5. 构建货币上下文：预算等级(人民币) → 用户货币换算
+    // 1.5. 构建货币上下文：预算等级(单人每日人民币) → 全团总预算换算
+    // 注意：BUDGET_CNY_PER_DAY 是【单人日均】口径，必须乘天数×人数得到全团总预算
     const currencyCode = preferences.currency || currency.getDefaultCurrencyForLanguage(preferences.language) || 'USD';
     const days = Number(preferences.days) || 1;
+    const travelersNum = (() => {
+      const t = preferences.travelers;
+      if (!t) return 2;
+      const m = String(t).match(/\d+/);
+      return m ? parseInt(m[0], 10) : 2;
+    })();
     const cnyPerDay = BUDGET_CNY_PER_DAY[preferences.budget] || 350;
-    const cnyTotal = cnyPerDay * days;
+    const cnyTotal = cnyPerDay * days * travelersNum;
     const budgetInCurrency = currency.convert(cnyTotal, 'CNY', currencyCode);
     const budgetRangeStr = currency.format(budgetInCurrency, currencyCode);
 
-    console.log(`[INFO] 预算：¥${cnyTotal} CNY ≈ ${budgetRangeStr} ${currencyCode}`);
+    console.log(`[INFO] 预算：¥${cnyPerDay}/人/天 × ${days}天 × ${travelersNum}人 = ¥${cnyTotal} CNY ≈ ${budgetRangeStr} ${currencyCode}`);
 
     // 2. 构建提示词并调用 DeepSeek
     const currencyContext = {
       currency: currencyCode,
       budgetInCurrency,
-      budgetRange: budgetRangeStr
+      budgetRange: budgetRangeStr,
+      cnyPerDay,
+      travelers: travelersNum,
+      days
     };
     const userPrompt = buildUserPrompt(preferences, knowledgeBase, currencyContext);
     const apiKey = process.env.DEEPSEEK_API_KEY;
