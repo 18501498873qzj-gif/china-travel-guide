@@ -719,7 +719,7 @@ document.getElementById('buyBtn').addEventListener('click', async () => {
   var __payload = {
     items: [{ priceId: "pri_01m0h0hs1axtqq0fzssmk99qm1", quantity: 1 }],
     customer: { email: data.email },
-    customData: JSON.stringify({ email: data.email, orderId: orderId }),
+    customData: JSON.stringify({ email: data.email, orderId: orderId, preferences: JSON.stringify(data) }),
     settings: {
       themeMode: "light",
       successUrl: window.location.origin + "/order?success=true",
@@ -870,17 +870,35 @@ if (new URLSearchParams(window.location.search).get('success') === 'true') {
       }
     }
 
+    // 凭「已验签支付订单号 + 邮箱」换取一次性令牌；webhook 可能比成功页慢，故轮询重试
+    function requestPaidToken(orderId, email, attempt) {
+      const MAX_ATTEMPTS = 6;
+      return fetch('/request-generate-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: orderId, email: email })
+      }).then(r => {
+        if ((r.status === 403 || r.status === 404) && attempt < MAX_ATTEMPTS) {
+          return new Promise(resolve => setTimeout(resolve, 2000))
+            .then(() => requestPaidToken(orderId, email, attempt + 1));
+        }
+        if (!r.ok) throw new Error('get_token_fail_' + r.status);
+        return r.json();
+      });
+    }
+
     function tryInstantGenerate() {
       const isZh = lang === '中文（简体）';
       setLoadingText(
-        isZh ? '⏳ 正在生成中，请稍候...（超时后会继续后台生成，确保邮件送达）'
-             : '⏳ Generating, please wait... (If it times out, it continues in background - email is guaranteed)',
+        isZh ? '⏳ 正在确认支付并生成，请稍候...（超时后攻略仍会自动发到邮箱）'
+             : '⏳ Confirming payment and generating... (If it times out, your guide is still emailed to you)',
         '#e3f2fd'
       );
       downloadBtn.style.display = 'none';
 
-      fetch('/request-generate-token', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-        .then(r => { if (!r.ok) throw new Error('get_token_fail'); return r.json(); })
+      const paidOrderId = sessionStorage.getItem('orderId') || '';
+      const paidEmail = (preferences && preferences.email) ? preferences.email : '';
+      return requestPaidToken(paidOrderId, paidEmail, 1)
         .then(({ token }) => {
           if (!token) throw new Error('empty_token');
           const ctrl = new AbortController();
@@ -923,58 +941,19 @@ if (new URLSearchParams(window.location.search).get('success') === 'true') {
             ? '<div style="margin-bottom:10px;color:#2e7d32;">✅ 支付成功！攻略正在后台生成，<strong>几分钟内会自动发到 ' + email + '</strong>。</div><div style="font-size:0.8rem;color:#666;">如 30 分钟没收到请检查垃圾邮件或联系客服。</div>'
             : '<div style="margin-bottom:10px;color:#2e7d32;">✅ Payment received! Your guide is being generated and will arrive at <strong>' + email + '</strong> in a few minutes.</div><div style="font-size:0.8rem;color:#666;">Check spam folder if not received within 30 min.</div>';
           setLoadingText(htm, '#e8f5e9');
-          const retryBtn = document.createElement('button');
-          retryBtn.textContent = isZh2 ? '🔄 再试一次即时下载' : '🔄 Try instant download again';
-          retryBtn.style.cssText = 'margin-top:12px;background:#1a1a1a;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;';
-          retryBtn.onclick = tryInstantGenerate;
-          loadingMsg.appendChild(retryBtn);
+          // 令牌已签发/订单未确认时重试无意义，邮件仍会由 webhook 送达
+          if (!/40[39]/.test(err.message)) {
+            const retryBtn = document.createElement('button');
+            retryBtn.textContent = isZh2 ? '🔄 再试一次即时下载' : '🔄 Try instant download again';
+            retryBtn.style.cssText = 'margin-top:12px;background:#1a1a1a;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;';
+            retryBtn.onclick = tryInstantGenerate;
+            loadingMsg.appendChild(retryBtn);
+          }
         });
     }
 
-    tryInstantGenerate()
-      .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed to obtain generate token')))
-      .then(({ token }) => {
-        if (!token) return Promise.reject(new Error('Empty generate token'));
-        // Step 2: 带合法一次性 token 调用 POST / 生成攻略
-        return fetch('/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ preferences, format: 'doc', generate_token: token })
-        });
-      })
-    .then(res => res.json().then(data => ({ ok: res.ok, data })))
-    .then(({ ok, data }) => {
-      if (!ok) throw new Error(data.error || 'Generation failed');
-
-      // Show download button for instant access
-      if (data.docBase64) {
-        document.getElementById('downloadHint').textContent = t.downloadHint;
-        document.getElementById('downloadBtnText').textContent = t.downloadBtn;
-        document.getElementById('downloadSection').style.display = 'block';
-
-        document.getElementById('downloadBtn').onclick = () => {
-          const binary = atob(data.docBase64);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          const blob = new Blob([bytes], { type: 'application/msword' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = data.fileName || 'travel-guide.doc';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        };
-      }
-
-      sessionStorage.removeItem('orderFormData');
-    })
-    .catch(err => {
-      // Don't show error to user — email will still be delivered by webhook
-      console.warn('Generation API error (non-critical):', err.message);
-      sessionStorage.removeItem('orderFormData');
-    });
+    // 只保留一次生成流程（取令牌 + 生成 + 下载按钮均在 tryInstantGenerate 内部完成）
+    tryInstantGenerate();
   }
 }
 </script>

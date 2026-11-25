@@ -15,10 +15,16 @@ try { nodemailer = require('nodemailer'); } catch (e) { /* nodemailer 可选，�
 // key: token 随机串, value: { expireAt: ms, used: false }
 const TEMP_TOKEN_TTL_MS = 3 * 60 * 1000; // 3 分钟内一次性有效
 const tempTokens = new Map();
+const tokenRateLimit = new Map(); // IP -> [timestamp]，防止暴力枚举订单号
 setInterval(() => {
   const now = Date.now();
   for (const [k, v] of tempTokens.entries()) {
     if (now > v.expireAt) tempTokens.delete(k);
+  }
+  for (const [ip, times] of tokenRateLimit.entries()) {
+    const recent = times.filter(t => now - t < 60 * 1000);
+    if (recent.length === 0) tokenRateLimit.delete(ip);
+    else tokenRateLimit.set(ip, recent);
   }
 }, 60 * 1000).unref(); // 每 1 分钟清理一次，unref 不阻塞进程退出
 
@@ -475,6 +481,12 @@ exports.handler = async (event, context) => {
     }
     const { preferences, format = 'doc', admin_secret = null, generate_token = null } = body;
 
+    // 提前解析邮箱，用于令牌绑定校验与邮件发送
+    const userEmail = preferences && preferences.email ? String(preferences.email).trim() : null;
+    if (userEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
+      return jsonRes(400, { error: '邮箱格式不正确' });
+    }
+
     // 🔒 访问控制：必须满足以下任一条件才能生成攻略（否则 403）
     const allowAdmin = process.env.ADMIN_GENERATE_KEY
       && typeof admin_secret === 'string'
@@ -485,14 +497,23 @@ exports.handler = async (event, context) => {
     if (typeof generate_token === 'string' && generate_token.length > 0) {
       const rec = tempTokens.get(generate_token);
       if (rec && !rec.used && Date.now() < rec.expireAt) {
-        rec.used = true; // 一次性，用完作废
-        tempTokens.set(generate_token, rec);
-        allowPaidToken = true;
+        // 🔒 令牌必须绑定已验签支付的订单邮箱；旧版无绑定令牌一律拒绝
+        const boundEmail = rec.email ? String(rec.email).toLowerCase() : '';
+        const claimEmail = userEmail ? userEmail.toLowerCase() : '';
+        if (!boundEmail || !rec.orderId || !rec.transactionId) {
+          console.warn('[SECURITY] 令牌缺少支付绑定信息，拒绝（旧令牌或伪造）');
+        } else if (!claimEmail || claimEmail !== boundEmail) {
+          console.warn('[SECURITY] 令牌邮箱与请求邮箱不一致，拒绝');
+        } else {
+          rec.used = true; // 一次性，用完作废
+          tempTokens.set(generate_token, rec);
+          allowPaidToken = true;
+        }
       }
     }
 
     if (!allowAdmin && !allowPaidToken) {
-      console.warn('[SECURITY] 未付费/未授权访问 POST / 已拦截。是否带 admin_secret 或 generate_token？');
+      console.warn('[SECURITY] 未付费/未授权访问 POST / 已拦截。');
       return jsonRes(403, {
         error: 'Payment required. Please purchase through /order first.',
         hint_zh: '必须先在 /order 页面完成支付，才能生成攻略。管理员可设置 ADMIN_GENERATE_KEY 环境变量并传入 admin_secret 参数。'
@@ -501,10 +522,6 @@ exports.handler = async (event, context) => {
 
     if (!preferences || !preferences.cities || !preferences.days) {
       return jsonRes(400, { error: '缺少必要参数：cities, days' });
-    }
-    const userEmail = preferences.email ? String(preferences.email).trim() : null;
-    if (userEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
-      return jsonRes(400, { error: '邮箱格式不正确' });
     }
 
     // 1. 读取飞书知识库（从环境变量获取配置）
@@ -570,7 +587,10 @@ exports.handler = async (event, context) => {
       const docBuf = Buffer.isBuffer(docContent) ? docContent : Buffer.from(docContent, 'utf-8');
       const fileName = localizedFile.replace(/\.doc$/, `-不完整${Date.now()}.doc`);
       let emailResult = null;
-      if (userEmail) {
+      if (userEmail && !allowPaidToken) {
+        // 已支付令牌路径：webhook 已负责发邮件，这里只返回文档供即时下载，避免重复投递
+        emailResult = { skipped: 'webhook_delivers_email' };
+      } else if (userEmail) {
         emailResult = await sendGuideEmail(userEmail, fileName, docBuf, preferences);
       }
       return {
@@ -603,7 +623,10 @@ exports.handler = async (event, context) => {
     const docBuf = Buffer.isBuffer(docContent) ? docContent : Buffer.from(docContent, 'utf-8');
     const fileName = localizedFile;
     let emailResult = null;
-    if (userEmail) {
+    if (userEmail && !allowPaidToken) {
+      // 已支付令牌路径：webhook 已负责发邮件，这里只返回文档供即时下载，避免重复投递
+      emailResult = { skipped: 'webhook_delivers_email' };
+    } else if (userEmail) {
       emailResult = await sendGuideEmail(userEmail, fileName, docBuf, preferences);
     }
 
@@ -1039,18 +1062,71 @@ if (require.main === module) {
       return;
     }
 
-    // POST /request-generate-token — 仅在支付成功页面发放临时一次性生成令牌（3分钟有效）
+    // POST /request-generate-token — 必须凭「已验签支付订单号 + 邮箱」换取一次性令牌
     if (req.method === 'POST' && req.url === '/request-generate-token') {
-      try {
-        // 随机 32 字节 token
-        const token = crypto.randomBytes(24).toString('hex');
-        tempTokens.set(token, { expireAt: Date.now() + TEMP_TOKEN_TTL_MS, used: false });
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS });
-        res.end(JSON.stringify({ ok: true, token, ttl_seconds: Math.floor(TEMP_TOKEN_TTL_MS / 1000) }));
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ ok: false, error: 'Failed to issue generate token: ' + err.message }));
-      }
+      let chunks = '';
+      req.on('data', c => chunks += c);
+      req.on('end', () => {
+        try {
+          let body = {};
+          try { body = JSON.parse(chunks || '{}'); } catch (e) {}
+          const orderId = typeof body.orderId === 'string' ? body.orderId.trim() : '';
+          const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+          const now = Date.now();
+
+          // 频率限制：同一 IP 每分钟最多 10 次，防暴力枚举订单号
+          const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+          const hits = (tokenRateLimit.get(ip) || []).filter(t => now - t < 60 * 1000);
+          if (hits.length >= 10) {
+            console.warn(`[SECURITY] 令牌请求频率超限: ${ip}`);
+            res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS });
+            res.end(JSON.stringify({ ok: false, error: 'Too many requests' }));
+            return;
+          }
+          hits.push(now);
+          tokenRateLimit.set(ip, hits);
+
+          if (!orderId || !email) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS });
+            res.end(JSON.stringify({ ok: false, error: 'orderId and email are required' }));
+            return;
+          }
+
+          // 只认 webhook（Paddle 验签通过）写入的订单
+          const order = loadOrders().find(o =>
+            o.orderId === orderId &&
+            String(o.email || '').trim().toLowerCase() === email &&
+            !!o.transactionId
+          );
+          if (!order) {
+            console.warn(`[SECURITY] 无已验证支付订单，拒绝发令牌: ${orderId}`);
+            res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS });
+            res.end(JSON.stringify({ ok: false, error: 'No verified payment found for this order.' }));
+            return;
+          }
+          if (order.tokenIssuedAt) {
+            res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS });
+            res.end(JSON.stringify({ ok: false, error: 'Token already issued for this order.' }));
+            return;
+          }
+
+          const token = crypto.randomBytes(24).toString('hex');
+          tempTokens.set(token, {
+            expireAt: now + TEMP_TOKEN_TTL_MS,
+            used: false,
+            email,
+            orderId,
+            transactionId: order.transactionId
+          });
+          updateOrderStatus(orderId, { tokenIssuedAt: now });
+          console.log(`[SECURITY] 已为订单 ${orderId} 签发一次性令牌`);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS });
+          res.end(JSON.stringify({ ok: true, token, ttl_seconds: Math.floor(TEMP_TOKEN_TTL_MS / 1000) }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Failed to issue generate token: ' + err.message }));
+        }
+      });
       return;
     }
 
@@ -1129,6 +1205,18 @@ if (require.main === module) {
 
               // 保存订单信息到持久化存储
               const orderId = customData.orderId || `CTG-${Date.now()}`;
+
+              // 🔒 幂等：同一交易重复回调时跳过，避免重置 tokenIssuedAt / 重复发信
+              const existingOrder = loadOrders().find(o =>
+                (transaction.id && o.transactionId === transaction.id) || o.orderId === orderId
+              );
+              if (existingOrder) {
+                console.log(`[WEBHOOK] 订单 ${orderId} 已处理过，忽略重复回调`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ received: true, duplicate: true }));
+                return;
+              }
+
               const txnAmount = transaction.amount || {};
               saveOrder({
                 orderId,
